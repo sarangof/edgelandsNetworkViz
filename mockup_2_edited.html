@@ -1,0 +1,294 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>3D People Network (mock)</title>
+  <style>
+    html, body { height:100%; margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    #layout { display:grid; grid-template-columns: 340px 1fr; height:100%; }
+    #left { border-right:1px solid #eee; padding:12px; overflow:auto; background: var(--panel-background, #ffffff); }
+    #graph.vis3d { position:relative; background: var(--graph-background, #ffffff); }
+    #graph > div { position:absolute; inset:0; }
+    h2.h2 { margin:0 0 10px; font-size:16px; font-weight:600; }
+    label { display:block; margin-top:10px; font-weight:600; }
+    select, input[type=text] { width:100%; padding:6px; border:1px solid #ddd; border-radius:6px; }
+    button { padding:6px 10px; border:1px solid #ddd; border-radius:6px; background:#fff; cursor:pointer; }
+    .row { display:flex; gap:8px; margin-top:10px; align-items:center; }
+    .stat { color:#666; font-size:12px; margin-top:8px; }
+    table.table { width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
+    table.table th, table.table td { border:1px solid #eee; padding:6px 8px; text-align:left; }
+    table.table th { background:#fafafa; position:sticky; top:0; cursor:pointer; }
+    tr.selected { background:#fff6d6; }
+    .details { font-size:13px; border:1px solid #eee; border-radius:8px; padding:10px; margin-top:10px; background:#fafafa; }
+    .muted { color:#777; font-size:12px; }
+  </style>
+
+  <!-- Fonts + brand stylesheet -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Georama:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css">
+</head>
+<body class="theme--formal">
+<div id="layout">
+  <div id="left">
+    <h2 class="h2">3D People Network (mock)</h2>
+    <div class="stat" id="counts"></div>
+
+    <label>Edges</label>
+    <select id="edgeRule">
+      <option value="random">Random (demo)</option>
+      <option value="city">Same City</option>
+      <option value="org">Same Organization</option>
+      <option value="event">Same Event/Connection</option>
+    </select>
+
+    <div class="row">
+      <div style="flex:1">
+        <label>Filter: City</label>
+        <select id="cityFilter"><option value="">(all)</option></select>
+      </div>
+      <div style="flex:1">
+        <label>Search: Organization</label>
+        <input id="orgSearch" type="text" placeholder="type to filter…"/>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="reset">Reset view</button>
+      <button id="clearSel">Clear selection</button>
+    </div>
+
+    <div class="details" id="details">
+      <div class="muted">Click a node or table row to see details here.</div>
+    </div>
+
+    <label style="margin-top:12px">Mock data</label>
+    <table id="tbl" class="table">
+      <thead>
+        <tr>
+          <th data-col="last">Last Name ▲▼</th>
+          <th data-col="first">First Name ▲▼</th>
+          <th data-col="email">Email ▲▼</th>
+          <th data-col="city">City ▲▼</th>
+          <th data-col="event">Event/Connection ▲▼</th>
+          <th data-col="org">Organization ▲▼</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="graph" class="vis3d"><div id="3d"></div></div>
+</div>
+
+<!-- 3D Force Graph (includes three.js) -->
+<script src="https://unpkg.com/3d-force-graph"></script>
+<script>
+  // ---- Mock rows ----
+  const rows = [
+    {last:"Okello", first:"Amina", email:"amina.okello@example.org", city:"Nairobi", event:"Summit 2024",        org:"Open Energy Lab"},
+    {last:"Mwangi", first:"David", email:"d.mwangi@example.org",      city:"Nairobi", event:"Workshop Kenya",     org:"Clean Power Fund"},
+    {last:"Kamau",  first:"Lydia", email:"lydia.k@example.org",       city:"Nairobi", event:"Workshop Kenya",     org:"Urban Lab"},
+    {last:"Otieno", first:"Brian", email:"b.otieno@example.org",      city:"Nairobi", event:"Panel on Grids",     org:"GridWorks Africa"},
+    {last:"Cherono",first:"Faith", email:"faith.c@example.org",       city:"Nairobi", event:"Summit 2024",        org:"Ministry of Energy"},
+    {last:"Rojas",  first:"Lucía", email:"lucia.r@example.org",       city:"Lima",    event:"Andes Energy Panel", org:"Civic Data Co."},
+    {last:"Mejía",  first:"Carlos",email:"cmejia@example.org",        city:"Lima",    event:"Andes Energy Panel", org:"University Y"},
+    {last:"Vega",   first:"Sofía", email:"s.vega@example.org",        city:"Lima",    event:"Solar Hackday",      org:"Energy Startup X"},
+    {last:"García", first:"Ana",   email:"ana.g@example.org",         city:"Bogotá",  event:"Grid Interop",       org:"Ministry of Mines"},
+    {last:"López",  first:"Mateo", email:"mateo.l@example.org",       city:"Bogotá",  event:"Grid Interop",       org:"Open Energy Lab"},
+    {last:"Pardo",  first:"Nina",  email:"nina.p@example.org",        city:"Bogotá",  event:"Solar Hackday",      org:"Green NGO"},
+    {last:"Boateng",first:"Kojo",  email:"k.boateng@example.org",     city:"Accra",   event:"West Africa Forum",  org:"Clean Power Fund"},
+    {last:"Mensah", first:"Esi",   email:"esi.mensah@example.org",    city:"Accra",   event:"West Africa Forum",  org:"Ministry of Energy"},
+    {last:"Gupta",  first:"Ken",   email:"ken.n@example.org",         city:"Nairobi", event:"Solar Hackday",      org:"Civic Data Co."},
+    {last:"Mugo",   first:"Joy",   email:"joy.mugo@example.org",      city:"Nairobi", event:"Grid Interop",       org:"Open Energy Lab"},
+    {last:"Castro", first:"Diego", email:"d.castro@example.org",      city:"Lima",    event:"Grid Interop",       org:"GridWorks Africa"},
+    {last:"Torres", first:"María", email:"m.torres@example.org",      city:"Bogotá",  event:"Summit 2024",        org:"University Y"},
+    {last:"Quaye",  first:"Ama",   email:"ama.quaye@example.org",     city:"Accra",   event:"Panel on Grids",     org:"Open Energy Lab"},
+    {last:"Patel",  first:"Neel",  email:"neel.patel@example.org",    city:"Delhi",   event:"Solar Hackday",      org:"Green NGO"},
+    {last:"Fernández",first:"Paz", email:"paz.f@example.org",         city:"Lima",    event:"Workshop Kenya",     org:"Ministry of Energy"},
+    {last:"Ortiz",  first:"Juan",  email:"juan.ortiz@example.org",    city:"Bogotá",  event:"West Africa Forum",  org:"Power Access"},
+    {last:"Yeboah", first:"Afua",  email:"afua.y@example.org",        city:"Accra",   event:"Andes Energy Panel", org:"Urban Lab"}
+  ];
+
+  const nodes = rows.map((r, i) => ({
+    id: 'p' + (i+1),
+    label: \`\${r.first} \${r.last}\`,
+    last: r.last, first: r.first, email: r.email,
+    city: r.city, event: r.event, org: r.org
+  }));
+  let links = [];
+  let selectedId = null;
+  const visible = new Set(nodes.map(n => n.id));
+
+  // HTML refs
+  const $edgeRule = document.getElementById('edgeRule');
+  const $city = document.getElementById('cityFilter');
+  const $orgQ = document.getElementById('orgSearch');
+  const $counts = document.getElementById('counts');
+  const $reset = document.getElementById('reset');
+  const $clearSel = document.getElementById('clearSel');
+  const $tbody = document.querySelector('#tbl tbody');
+  const $details = document.getElementById('details');
+
+  // City options
+  const cities = [...new Set(rows.map(r => r.city))].sort();
+  cities.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; $city.appendChild(o); });
+
+  // Colors from CSS variables
+  const css = getComputedStyle(document.documentElement);
+  const COL_NODE = css.getPropertyValue('--graph-node').trim() || '#00B08B';
+  const COL_SEL  = css.getPropertyValue('--graph-node-selected').trim() || '#DAF300';
+  const COL_LINK = css.getPropertyValue('--graph-link').trim() || 'rgba(180,180,180,0.6)';
+  function colorForCity(city) {
+    const varName = \`--city-\${(city || '').toLowerCase().replace(/\s+/g,'')}\`;
+    const v = css.getPropertyValue(varName).trim();
+    return v || COL_NODE;
+  }
+
+  // Table + sorting
+  let sortCol = 'last', sortAsc = true;
+  function renderTable() {
+    const q = $orgQ.value.trim().toLowerCase();
+    const city = $city.value;
+    const arr = nodes
+      .filter(n => (!city || n.city===city) && (!q || (n.org||'').toLowerCase().includes(q)))
+      .sort((a,b)=> (a[sortCol] > b[sortCol] ? (sortAsc?1:-1) : (sortAsc?-1:1)));
+    $tbody.innerHTML = '';
+    arr.forEach(n => {
+      const tr = document.createElement('tr');
+      tr.dataset.id = n.id;
+      tr.innerHTML = \`<td>\${n.last}</td><td>\${n.first}</td><td>\${n.email}</td><td>\${n.city}</td><td>\${n.event}</td><td>\${n.org}</td>\`;
+      tr.onclick = () => focusNode(n.id);
+      if (n.id===selectedId) tr.classList.add('selected');
+      $tbody.appendChild(tr);
+    });
+  }
+  renderTable();
+  document.querySelectorAll('th[data-col]').forEach(th=>{
+    th.onclick = ()=>{ const c=th.dataset.col; sortAsc = (sortCol===c)? !sortAsc : true; sortCol=c; renderTable(); };
+  });
+
+  // Edge builders
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a; }
+  function addGroupLinks(ids, kind) {
+    if (ids.length <= 20) {
+      for (let i=0;i<ids.length;i++) for (let j=i+1;j<ids.length;j++) links.push({source:ids[i], target:ids[j], kind});
+    } else {
+      const arr = shuffle(ids.slice());
+      for (let i=0;i<arr.length;i++) links.push({source:arr[i], target:arr[(i+1)%arr.length], kind});
+      const extra = Math.min(arr.length * 2, 1000);
+      for (let k=0;k<extra;k++){
+        const s = arr[Math.floor(Math.random()*arr.length)];
+        const t = arr[Math.floor(Math.random()*arr.length)];
+        if (s!==t) links.push({source:s, target:t, kind});
+      }
+    }
+  }
+  function rebuildLinks(kind) {
+    links = [];
+    const ids = nodes.map(n => n.id);
+    if (kind === 'random') {
+      const m = Math.min(ids.length*2, 600);
+      const used = new Set();
+      while (used.size < m) {
+        const s = ids[Math.floor(Math.random()*ids.length)];
+        const t = ids[Math.floor(Math.random()*ids.length)];
+        const key = s<t ? s+'|'+t : t+'|'+s;
+        if (s!==t && !used.has(key)){ used.add(key); links.push({source:s, target:t, kind}); }
+      }
+    } else {
+      const keyAttr = kind==='city'?'city': kind==='org'?'org':'event';
+      const groups = {};
+      nodes.forEach(n => (groups[n[keyAttr]] ??= []).push(n.id));
+      Object.values(groups).forEach(list => addGroupLinks(list, kind));
+    }
+  }
+
+  // 3D Graph
+  const world = ForceGraph3D()
+    (document.getElementById('3d'))
+    .graphData({ nodes, links })
+    .nodeId('id')
+    .nodeLabel(n => \`\${n.label}\n\${n.org} — \${n.city}\`)
+    .nodeRelSize(4)
+    .nodeOpacity(0.9)
+    .linkOpacity(0.6)
+    .linkWidth(1)
+    .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim() || '#ffffff')
+    .nodeColor(n => (n.id === selectedId) ? COL_SEL : colorForCity(n.city))
+    .linkColor(l => (l.source.id === selectedId || l.target.id === selectedId) ? COL_SEL : COL_LINK)
+    .onNodeClick(n => focusNode(n.id));
+
+  function refit() { world.graphData({ nodes: nodes, links: links }); updateCounts(); }
+  function focusNode(id) {
+    selectedId = id;
+    const n = nodes.find(x => x.id===id);
+    if (!n) return;
+    document.getElementById('details').innerHTML = \`
+      <div><strong>\${n.first} \${n.last}</strong></div>
+      <div class="muted">\${n.email}</div>
+      <div>\${n.city} · \${n.event}</div>
+      <div>\${n.org}</div>\`;
+    // refresh colors
+    world.nodeColor(world.nodeColor());
+    world.linkColor(world.linkColor());
+  }
+  function updateCounts(){
+    const visN = nodes.filter(n => visible.has(n.id)).length;
+    const visE = links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target)).length;
+    $counts.textContent = \`Visible: \${visN} nodes, \${visE} edges\`;
+  }
+  updateCounts();
+
+  // Filters
+  function applyFilters(){
+    visible.clear();
+    const city = $city.value;
+    const q = $orgQ.value.trim().toLowerCase();
+    nodes.forEach(n => {
+      const okCity = !city || n.city===city;
+      const okOrg = !q || (n.org||'').toLowerCase().includes(q);
+      if (okCity && okOrg) visible.add(n.id);
+    });
+    // hide nodes/links by filtering graphData
+    const filtered = {
+      nodes: nodes.filter(n => visible.has(n.id)),
+      links: links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target))
+    };
+    world.graphData(filtered);
+    renderTable(); updateCounts();
+  }
+
+  // Table
+  function renderTable(){
+    const arr = nodes.filter(n => visible.has(n.id))
+      .sort((a,b)=> (a[sortCol] > b[sortCol] ? (sortAsc?1:-1) : (sortAsc?-1:1)));
+    const $tbody = document.querySelector('#tbl tbody');
+    $tbody.innerHTML = '';
+    arr.forEach(n => {
+      const tr = document.createElement('tr');
+      tr.dataset.id = n.id;
+      tr.innerHTML = \`<td>\${n.last}</td><td>\${n.first}</td><td>\${n.email}</td><td>\${n.city}</td><td>\${n.event}</td><td>\${n.org}</td>\`;
+      tr.onclick = () => focusNode(n.id);
+      $tbody.appendChild(tr);
+    });
+  }
+  document.querySelectorAll('#tbl thead th').forEach(th=>{
+    th.onclick = ()=>{ const c=th.dataset.col; sortAsc = (sortCol===c)? !sortAsc : true; sortCol=c; renderTable(); };
+  });
+
+  // UI
+  $edgeRule.onchange = ()=>{ rebuildLinks($edgeRule.value); applyFilters(); };
+  $city.onchange     = applyFilters;
+  $orgQ.oninput      = applyFilters;
+  $reset.onclick     = ()=>{ world.zoomToFit(400); $city.value=""; $orgQ.value=""; applyFilters(); };
+  $clearSel.onclick  = ()=>{ selectedId=null; document.getElementById('details').innerHTML='<div class="muted">Click a node or table row to see details here.</div>'; world.nodeColor(world.nodeColor()); world.linkColor(world.linkColor()); };
+
+  // Init
+  rebuildLinks($edgeRule.value);
+  applyFilters();
+  renderTable();
+</script>
+</body>
+</html>
