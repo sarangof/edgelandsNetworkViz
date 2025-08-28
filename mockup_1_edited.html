@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>People Network (mock)</title>
+  <title>People Network (draft)</title>
   <style>
     html, body { margin:0; height:100%; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
     #app { display:grid; grid-template-columns: 320px 1fr; height:100%; }
@@ -81,31 +81,62 @@
   import FA2Layout from "https://cdn.jsdelivr.net/npm/graphology-layout-forceatlas2@0.10.1/worker.js/+esm";
 
   // ---- Mock rows (swap with your data later) ----
-  const rows = [
-    {last:"Okello", first:"Amina", email:"amina.okello@example.org", city:"Nairobi", event:"Summit 2024",          org:"Open Energy Lab"},
-    {last:"Mwangi", first:"David", email:"d.mwangi@example.org",      city:"Nairobi", event:"Workshop Kenya",       org:"Clean Power Fund"},
-    {last:"Kamau",  first:"Lydia", email:"lydia.k@example.org",       city:"Nairobi", event:"Workshop Kenya",       org:"Urban Lab"},
-    {last:"Otieno", first:"Brian", email:"b.otieno@example.org",      city:"Nairobi", event:"Panel on Grids",       org:"GridWorks Africa"},
-    {last:"Cherono",first:"Faith", email:"faith.c@example.org",       city:"Nairobi", event:"Summit 2024",          org:"Ministry of Energy"},
-    {last:"Rojas",  first:"Lucía", email:"lucia.r@example.org",       city:"Lima",    event:"Andes Energy Panel",   org:"Civic Data Co."},
-    {last:"Mejía",  first:"Carlos",email:"cmejia@example.org",        city:"Lima",    event:"Andes Energy Panel",   org:"University Y"},
-    {last:"Vega",   first:"Sofía", email:"s.vega@example.org",        city:"Lima",    event:"Solar Hackday",        org:"Energy Startup X"},
-    {last:"García", first:"Ana",   email:"ana.g@example.org",         city:"Bogotá",  event:"Grid Interop",         org:"Ministry of Mines"},
-    {last:"López",  first:"Mateo", email:"mateo.l@example.org",       city:"Bogotá",  event:"Grid Interop",         org:"Open Energy Lab"},
-    {last:"Pardo",  first:"Nina",  email:"nina.p@example.org",        city:"Bogotá",  event:"Solar Hackday",        org:"Green NGO"},
-    {last:"Boateng",first:"Kojo",  email:"k.boateng@example.org",     city:"Accra",   event:"West Africa Forum",    org:"Clean Power Fund"},
-    {last:"Mensah", first:"Esi",   email:"esi.mensah@example.org",    city:"Accra",   event:"West Africa Forum",    org:"Ministry of Energy"},
-    {last:"Gupta",  first:"Ken",   email:"ken.n@example.org",         city:"Nairobi", event:"Solar Hackday",        org:"Civic Data Co."},
-    {last:"Mugo",   first:"Joy",   email:"joy.mugo@example.org",      city:"Nairobi", event:"Grid Interop",         org:"Open Energy Lab"},
-    {last:"Castro", first:"Diego", email:"d.castro@example.org",      city:"Lima",    event:"Grid Interop",         org:"GridWorks Africa"},
-    {last:"Torres", first:"María", email:"m.torres@example.org",      city:"Bogotá",  event:"Summit 2024",          org:"University Y"},
-    {last:"Quaye",  first:"Ama",   email:"ama.quaye@example.org",     city:"Accra",   event:"Panel on Grids",       org:"Open Energy Lab"},
-    {last:"Patel",  first:"Neel",  email:"neel.patel@example.org",    city:"Delhi",   event:"Solar Hackday",        org:"Green NGO"},
-    {last:"Fernández",first:"Paz", email:"paz.f@example.org",         city:"Lima",    event:"Workshop Kenya",       org:"Ministry of Energy"},
-    {last:"Ortiz",  first:"Juan",  email:"juan.ortiz@example.org",    city:"Bogotá",  event:"West Africa Forum",    org:"Power Access"},
-    {last:"Yeboah", first:"Afua",  email:"afua.y@example.org",        city:"Accra",   event:"Andes Energy Panel",   org:"Urban Lab"},
-    {last:"Gupta",  first:"Ravi",  email:"ravi.g@example.org",        city:"Delhi",   event:"Grid Interop",         org:"Civic Data Co."}
-  ];
+const rows = [
+  { last:"Tangarife",   first:"Emma",        email:"ejtangarib@eafit.edu.co",         city:"Medellín", event:"Team", org:"" },
+  { last:"Arango",      first:"Sara",        email:"sarangofc@gmail.com",             city:"Medellín", event:"Team", org:"" },
+  { last:"Aristizábal", first:"Juan Sebastián", email:"jarist23@eafit.edu.co",        city:"Medellín", event:"Team", org:"" },
+  { last:"Roldan",      first:"Maria Camila",email:"mcamirroldan@edgelands.institute",city:"Medellín", event:"Team", org:"" },
+  { last:"Goi",         first:"Maria Andrea",email:"mariaandreagg@gmail.com",         city:"Medellín", event:"Team", org:"" },
+  { last:"Zapata-Mazo", first:"Oswaldo",     email:"00zapataoswaldo00@gmail.com",     city:"Medellín", event:"Team", org:"" },
+
+  { last:"Uribe",       first:"Santiago",    email:"santiago@edgelands.institute",    city:"Cúcuta",   event:"Team", org:"" },
+  { last:"Alarcon",     first:"Veronica",    email:"vivianaveronicaasua@ufps.edu.co", city:"Cúcuta",   event:"Team", org:"Derecho a No Obedecer/Lead + Universidad FPS" },
+  { last:"Boada",       first:"Andres",      email:"andres@edgelands.institute",      city:"Cúcuta",   event:"Team", org:"" },
+
+  { last:"Tames de Sousa", first:"Angel",    email:"angel@edgelands.institute",       city:"Geneva",   event:"Team", org:"" },
+  { last:"Bogdani",     first:"Klea",        email:"klea.bogdani@graduateinstitute.ch", city:"Geneva", event:"Team", org:"" },
+  { last:"Cordy",       first:"Jeanne",      email:"jeanne.cordy@graduateinstitute.ch", city:"Geneva", event:"Team", org:"" },
+  { last:"Deshusses",   first:"Paul",        email:"paul.deshusses@graduateinstitute.ch", city:"Geneva", event:"Team", org:"" },
+  { last:"Garcia Vargas", first:"Laura",     email:"laura@edgelands.institute",       city:"Geneva",   event:"Team", org:"" },
+  { last:"Hofmann",     first:"Fabian",      email:"fhofman@ethz.ch",                 city:"Geneva",   event:"Team", org:"" },
+
+  { last:"Rappaz",      first:"Bernard",     email:"bernard.rappaz@proton.me",        city:"Geneva",   event:"Team", org:"" },
+  { last:"Chepkemoi",   first:"Cynthia",     email:"cynthiachepkemoi57@gmail.com",    city:"Nairobi",  event:"Team", org:"" },
+  { last:"Sambuli",     first:"Nanjira",     email:"email@nanjira.com",               city:"Nairobi",  event:"Team", org:"" },
+  { last:"Gathecha",    first:"Vanessa",     email:"vanessa@edgelands.institute",     city:"Nairobi",  event:"Team", org:"" },
+  { last:"Kithinji Muriuki", first:"Paul",   email:"paulk@edgelands.institute",       city:"Nairobi",  event:"Team", org:"" },
+  { last:"Mwangala",    first:"George",      email:"mugageo@gmail.com",               city:"Nairobi",  event:"Team", org:"" },
+  { last:"Tenca",       first:"Nicola",      email:"nicolatenca.com@gmail.com",       city:"Other/Global", event:"Team", org:"" },
+  { last:"Alibhai",     first:"Nabila",      email:"alibhai.nabila@gmail.com",        city:"Other/Global", event:"Team", org:"" },
+  { last:"Lozano",      first:"Flavia",      email:"flavia.lozano@gmail.com",         city:"Other/Global", event:"Team", org:"" },
+  { last:"Guterman",    first:"Jamie",       email:"jamie@edgelands.institute",       city:"Other/Global", event:"Team", org:"" },
+  { last:"Guzzo",       first:"Mateus",      email:"matguzzo@gmail.com",              city:"Other/Global", event:"Team", org:"" },
+  { last:"Harder",      first:"Karin",       email:"karin.harder@khrealms.com",       city:"Other/Global", event:"Team", org:"" },
+  { last:"Ros",         first:"Hélène",      email:"helene@edgelands.institute",      city:"Other/Global", event:"Team", org:"" },
+  { last:"Zermatten",   first:"Sophie",      email:"sophie@edgelands.institute",      city:"Other/Global", event:"Team", org:"" },
+  { last:"Lasso Harrier", first:"Adriana",   email:"adriana.lasso-harrier@boston.gov", city:"Other/Global", event:"Team", org:"" },
+  { last:"Newman",      first:"Sara",        email:"snewman@metalab.harvard.edu",     city:"Other/Global", event:"Team", org:"" },
+  { last:"Perrin",      first:"Benoit",      email:"benoitperrincreac@gmail.com",     city:"Other/Global", event:"Team", org:"" },
+  { last:"Py",          first:"Aude",        email:"aude.py@hotmail.com",             city:"Other/Global", event:"Team", org:"" },
+
+  { last:"Barabas",     first:"Chelsea",     email:"chelsea.barabas@gmail.com",       city:"Houston",  event:"Team", org:"" },
+  { last:"Kumar",       first:"Krupali",     email:"krupalikumar@gmail.com",          city:"Houston",  event:"Team", org:"" },
+  { last:"Joy",         first:"",            email:"miss.elefante@gmail.com",         city:"Houston",  event:"Team", org:"" },
+
+  { last:"Botero",      first:"Beatriz",     email:"bboteroa@gmail.com",              city:"Board",    event:"Team", org:"" },
+  { last:"Cepeda",      first:"Jesus",       email:"j@os.city",                       city:"Board",    event:"Team", org:"" },
+  { last:"Daccord",     first:"Yves",        email:"yves@yvesdaccord.com",            city:"Board",    event:"Team", org:"" },
+  { last:"Fischer",     first:"Philipp",     email:"pfischer@obersonabeles.com",      city:"Board",    event:"Team", org:"Assembly" },
+  { last:"Schaad",      first:"Beatrice",    email:"bea.schaad@bluewin.ch",           city:"Board",    event:"Team", org:"" },
+  { last:"Sawarschel",  first:"Marie-Claude",email:"sawer@bluewin.ch",                city:"Board",    event:"Team", org:"" },
+  { last:"Rybak",       first:"R.T.",        email:"rtrybak@mplsfoundation.org",      city:"Board",    event:"Team", org:"" },
+  { last:"Stojanovic",  first:"Aleksandar",  email:"aleksandar.stojanovic@museum.ch", city:"Board",    event:"Team", org:"" },
+  { last:"Hufschmid",   first:"Pascal",      email:"p.hufschmid@redcrossmuseum.ch",   city:"Board",    event:"Team", org:"" },
+  { last:"Kerimi",      first:"Danil",       email:"dkerimi@icloud.com",              city:"Board",    event:"Team", org:"" },
+  { last:"Koek",        first:"Ariane",      email:"ariane@koek.com",                 city:"Board",    event:"Team", org:"" },
+  { last:"Lee",         first:"Xiaodong",    email:"xiaodong.lee@me.com",             city:"Board",    event:"Team", org:"" },
+  { last:"McClain-Nhlapo", first:"Charlotte", email:"cmcclainnlapo@worldbank.org",    city:"Board",    event:"Team", org:"" }
+];
 
   // ---- Table ----
   const tbody = document.querySelector("#dataTable tbody");
@@ -121,7 +152,7 @@
   // Colors from CSS variables in brand.css
   const css = getComputedStyle(document.documentElement);
   function colorForCity(city) {
-    const varName = `--city-\${(city || '').toLowerCase().replace(/\s+/g,'')}`;
+    const varName = `--city-${(city || '').toLowerCase().replace(/\s+/g,'')}`;
     const v = css.getPropertyValue(varName).trim();
     return v || css.getPropertyValue('--graph-node').trim() || '#00B08B';
   }
@@ -132,7 +163,7 @@
     const id = "p" + (i+1);
     graph.addNode(id, {
       id,
-      label: `\${r.first} \${r.last}`,
+      label: `${r.first} ${r.last}`,
       email: r.email,
       city: r.city,
       event: r.event,
@@ -175,7 +206,7 @@
       while (used.size < m && tries < m*5) {
         const s = ids[Math.floor(Math.random()*ids.length)];
         const t = ids[Math.floor(Math.random()*ids.length)];
-        const key = s<t ? `\${s}|\${t}\` : \`\${t}|\${s}`;
+        const key = s < t ? (s + '|' + t) : (t + '|' + s);
         if (s!==t && !used.has(key)) { used.add(key); graph.addEdge(s, t, { kind, weight:1 }); }
         tries++;
       }
@@ -218,7 +249,7 @@
     let nVis=0, eVis=0;
     graph.forEachNode(n => { if (renderer.getNodeDisplayData(n)) nVis++; });
     graph.forEachEdge(e => { if (renderer.getEdgeDisplayData(e)) eVis++; });
-    $counts.textContent = `Visible: \${nVis} nodes, \${eVis} edges`;
+    $counts.textContent = `Visible: ${nVis} nodes, ${eVis} edges`;
   }
 
   $edgeRule.onchange = () => { rebuildEdges($edgeRule.value); applyReducers(); };
