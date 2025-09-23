@@ -1,0 +1,522 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>3D People Network (brand palette + collapsible + fixes)</title>
+
+  <!-- Brand + fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Georama:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css">
+
+  <style>
+    html, body { height:100%; margin:0; font-family: var(--font-sans, system-ui,-apple-system,Segoe UI,Roboto,sans-serif) }
+    #layout{
+      display:grid;
+      grid-template-columns:380px 1fr 340px;
+      grid-template-rows:1fr auto;
+      grid-template-areas:
+        "left graph right"
+        "bottom bottom bottom";
+      gap:16px; height:100%;
+      padding:12px; box-sizing:border-box;
+      background: var(--app-bg, #0b0b0b);
+    }
+    .panel{ border:1px solid var(--app-border, rgba(255,255,255,.08)); border-radius:14px; background: var(--app-surface,#111); box-shadow:0 2px 12px rgba(0,0,0,.3); color: var(--app-text,#e5e5e5) }
+    #left{ grid-area:left; padding:12px; overflow:auto }
+    #right{ grid-area:right; padding:12px; overflow:auto }
+    #graph.vis3d{ grid-area:graph; position:relative; background: var(--graph-background,#0b0b0b); border:1px solid var(--app-border); border-radius:14px; min-height:560px; box-shadow:0 2px 12px rgba(0,0,0,.3) }
+    #graph>div{ position:absolute; inset:0 }
+
+    #bottom{ grid-area:bottom; padding:12px; overflow:auto; max-height:55vh }
+    #counts{ font-size:13px; color: var(--col-muted,#9aa0a6); margin:0 0 6px 0 }
+
+    h2{margin:0 0 10px; font-size:16px; font-weight:700; font-family: var(--font-display,var(--font-sans)) }
+    label{display:block; margin-top:10px; font-weight:600}
+    select{ width:100%; padding:8px 10px; border-radius:10px; border:1px solid var(--app-border); background:#121212; color: var(--app-text,#e5e5e5) }
+    button{ padding:8px 12px; border-radius:999px; border:1px solid var(--brand-accent,#DAF300); background:transparent; color: var(--brand-accent,#DAF300); cursor:pointer }
+    .row{display:flex; gap:8px; margin-top:10px; align-items:center}
+    .muted{color: var(--col-muted,#9aa0a6); font-size:12px}
+
+    /* Boxed sections (collapsible) */
+    .box{ border:1px solid var(--app-border); border-radius:12px; background:#121212; margin-bottom:12px }
+    .box-head{ padding:10px }
+    .box-body{ padding:10px; border-top:1px solid var(--app-border) }
+    .box-toggle{
+      all:unset; display:flex; align-items:center; justify-content:space-between;
+      width:100%; cursor:pointer; font-weight:800; font-size:13px; letter-spacing:.02em
+    }
+    .box-toggle::after{ content:"▾"; opacity:.85; transition:transform .18s ease }
+    .box.is-closed .box-toggle::after{ transform:rotate(-90deg) }
+    .box.is-closed .box-body{ display:none }
+
+    /* Facets */
+    .facet{ margin-top:12px; border:1px solid var(--app-border); border-radius:12px; background:#121212; padding:10px }
+    .facet-title{ display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:700; margin:0 0 8px }
+    .facet-actions{ display:flex; gap:6px }
+    .facet-actions button{ font-size:11px; padding:4px 8px }
+    .facet-list{ max-height:160px; overflow:auto; padding-right:4px; display:grid; grid-template-columns:1fr; gap:6px }
+    .facet-item{ display:flex; align-items:center; gap:8px; font-size:13px }
+
+    /* Right cards */
+    .cards{display:grid; gap:10px; margin-top:8px}
+    .person-card{border:1px solid var(--app-border); border-radius:12px; padding:10px; background:#121212; box-shadow:0 1px 6px rgba(0,0,0,.25); cursor:pointer}
+    .person-card:hover{ box-shadow:0 2px 10px rgba(0,0,0,.35) }
+    .pc-name{ font-weight:700; margin:0 0 4px; font-family: var(--font-display,var(--font-sans)) }
+    .pc-email{ color:#8ab4f8; text-decoration:none; word-break:break-all }
+    .pc-row{ font-size:12px; color:#e5e5e5; margin-top:2px }
+    .pc-tags{ font-size:12px; color:#9aa0a6; margin-top:6px }
+
+    /* Table */
+    #bottom .frame-title{ margin:6px 0 6px; font-size:14px; font-weight:700; font-family: var(--font-display,var(--font-sans)) }
+    table.table{ width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; background: var(--app-surface,#111); border:1px solid var(--app-border); border-radius:12px; overflow:hidden }
+    table.table th, table.table td{ border-top:1px solid var(--app-border); padding:6px 8px; text-align:left }
+    table.table thead th{ background: rgba(255,255,255,.06); position:sticky; top:0; cursor:pointer; user-select:none; text-transform:uppercase; letter-spacing:.06em; font-family: var(--font-display,var(--font-sans)) }
+    tr.selected{ background: rgba(217,255,75,.12) }
+  </style>
+
+  <script src="https://unpkg.com/3d-force-graph"></script>
+  <script>
+  const CSV_DEFAULT_PATH='database_Sep10.csv';
+  const HEADER_MAP={"event/ connection":"event","last name":"last","first name":"first","email":"email","edgelands project":"project","language":"language","edgelands experience":"experience","expertise":"expertise","city":"city"};
+  const TOKEN_SPLIT=/[,;/|·]+/;
+  const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+|\/+/g,' ');
+
+  // If opened as file://, skip fetch entirely to avoid noisy CORS errors.
+  const IS_FILE_PROTOCOL = location.protocol === 'file:';
+
+  function detectDelimiter(t){const f=t.split(/\r?\n/).find(l=>l.trim())||"";return ((f.match(/;/g)||[]).length>(f.match(/,/g)||[]).length)?';':','}
+  function splitCSVLine(line,d){const o=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(q){if(ch==='"'){if(line[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}else{if(ch==='"')q=true;else if(ch===d){o.push(c);c=''}else c+=ch}}o.push(c);return o}
+  function parseCSV(text){
+    const d=detectDelimiter(text), lines=text.split(/\r?\n/).filter(l=>l.trim()); if(!lines.length) return [];
+    const header=splitCSVLine(lines[0],d).map(h=>norm(h)), keyFor=header.map(h=>HEADER_MAP[h]||h.replace(/\s+/g,'_'));
+    const rows=[]; for(let i=1;i<lines.length;i++){const cells=splitCSVLine(lines[i],d), obj={}; for(let c=0;c<header.length;c++){obj[keyFor[c]]=(cells[c]??'').trim()}
+      obj.first=obj.first||''; obj.last=obj.last||''; obj.email=obj.email||''; obj.project=obj.project||''; obj.language=obj.language||''; obj.experience=obj.experience||''; obj.expertise=obj.expertise||''; obj.city=obj.city||''; obj.event=obj.event||''; obj.label=[obj.first,obj.last].filter(Boolean).join(' ').trim()||'(unnamed)'; obj.org=obj.project; rows.push(obj)}
+    return rows
+  }
+  async function tryFetchCSV(p){
+    if (IS_FILE_PROTOCOL) return null;
+    try{
+      const r=await fetch(p,{cache:'no-cache'}); if(!r.ok) throw 0;
+      const t=await r.text(); const rows=parseCSV(t); if(!rows.length) throw 0; return rows;
+    }catch{ return null }
+  }
+  function askUserForCSV(){
+    return new Promise(res=>{
+      const b=document.createElement('div');
+      b.className='box';
+      b.innerHTML='<div class="box-head"><button class="box-toggle" aria-expanded="true">Load CSV</button></div><div class="box-body"><div class="muted">Choose a CSV to load your data:</div></div>';
+      const input=document.createElement('input'); input.type='file'; input.accept='.csv'; input.style.marginTop='8px';
+      input.onchange=e=>{const f=e.target.files[0]; if(!f) return; const rdr=new FileReader(); rdr.onload=()=>{b.remove(); res(parseCSV(rdr.result))}; rdr.readAsText(f)};
+      b.querySelector('.box-body').appendChild(input);
+      (document.getElementById('left')||document.body).prepend(b);
+    })
+  }
+  async function loadRows(){
+    const a=await tryFetchCSV(CSV_DEFAULT_PATH); if(a&&a.length) return a;
+    return await askUserForCSV();
+  }
+
+  // --- Brand tokens & palette ---
+  const css=getComputedStyle(document.documentElement);
+  const COL_NODE_DEFAULT=css.getPropertyValue('--graph-node').trim()||'#00B08B';
+  const COL_SEL =css.getPropertyValue('--graph-node-selected').trim()||'#DAF300';
+  const COL_LINK_DEFAULT=css.getPropertyValue('--graph-link').trim()||'rgba(180,180,180,0.6)';
+  function cityTokenColor(city){
+    const v=css.getPropertyValue(`--city-${(city||'').toLowerCase().replace(/\s+/g,'')}`).trim();
+    return v || null;
+  }
+  function firstToken(v){ return (v||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)[0] || '' }
+
+  // From brand slides
+  const BRAND_PALETTE = ['#335852','#70AF94','#D85751','#E2F16C','#473B36','#BCCFC8'];
+  const colorMap = { project:new Map(), language:new Map(), event:new Map(), fallback:new Map() };
+  function getBrandColor(value, domain='fallback'){
+    const key=(value||'').toLowerCase(); if(!key) return BRAND_PALETTE[0];
+    const cmap=colorMap[domain]||colorMap.fallback;
+    if(cmap.has(key)) return cmap.get(key);
+    const col=BRAND_PALETTE[cmap.size % BRAND_PALETTE.length]; cmap.set(key,col); return col;
+  }
+  </script>
+</head>
+
+<body class="theme--casual">
+<div id="layout">
+  <!-- Left -->
+  <div id="left" class="panel">
+    <h2>3D PEOPLE NETWORK</h2>
+
+    <!-- Selection (collapsible) -->
+    <div class="box collapsible" id="box-selection">
+      <div class="box-head">
+        <button class="box-toggle" id="toggle-selection" aria-expanded="true" aria-controls="selection-body">Selection tools</button>
+      </div>
+      <div class="box-body" id="selection-body">
+        <div class="row">
+          <button id="reset">Reset view</button>
+          <button id="clearSel">Clear selection</button>
+        </div>
+        <label class="row" style="margin-top:8px; align-items:center">
+          <input type="checkbox" id="useSelFilter" />
+          <span style="margin-left:8px">Filter by selection</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Edge rule (collapsible) -->
+    <div class="box collapsible" id="box-edge">
+      <div class="box-head">
+        <button class="box-toggle" id="toggle-edge" aria-expanded="true" aria-controls="edge-body">Edge rule</button>
+      </div>
+      <div class="box-body" id="edge-body">
+        <select id="edgeRule">
+          <option value="random">Random (demo)</option>
+          <option value="city">Same City</option>
+          <option value="org">Same Organization/Project</option>
+          <option value="event">Same Event/Connection</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Coloring (collapsible) -->
+    <div class="box collapsible" id="box-coloring">
+      <div class="box-head">
+        <button class="box-toggle" id="toggle-coloring" aria-expanded="true" aria-controls="coloring-body">Coloring</button>
+      </div>
+      <div class="box-body" id="coloring-body">
+        <label style="margin-top:0">Node color by</label>
+        <select id="nodeColorBy">
+          <option value="city" selected>City (brand)</option>
+          <option value="project">Edgelands Project</option>
+          <option value="language">Language</option>
+          <option value="event">Event/Connection</option>
+          <option value="none">None (single)</option>
+        </select>
+
+        <label>Edge color by</label>
+        <select id="edgeColorBy">
+          <option value="by-rule" selected>By edge rule</option>
+          <option value="same-nodes">Same as nodes</option>
+          <option value="static">Static</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Filters (collapsible) -->
+    <div class="box collapsible" id="box-filters">
+      <div class="box-head">
+        <button class="box-toggle" id="toggle-filters" aria-expanded="true" aria-controls="filters-body">Filters</button>
+      </div>
+      <div class="box-body" id="filters-body">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+          <button id="clearAllFilters" style="font-size:11px; padding:4px 8px">Clear all filters</button>
+        </div>
+        <div id="filters"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graph -->
+  <div id="graph" class="vis3d"><div id="3d"></div></div>
+
+  <!-- Right -->
+  <div id="right" class="panel">
+    <div id="details" class="details">
+      <div class="muted">Click a node or table row to see details here.</div>
+    </div>
+  </div>
+
+  <!-- Bottom -->
+  <div id="bottom" class="panel">
+    <div id="counts">Visible: —</div>
+    <div class="frame-title">Table</div>
+    <div class="muted" style="margin:-2px 0 6px 0;">Tip: Cmd/Ctrl-click to multi-select, Shift-click for ranges</div>
+    <table id="tbl" class="table">
+      <thead>
+        <tr>
+          <th data-col="last">LAST NAME ▲▼</th>
+          <th data-col="first">FIRST NAME ▲▼</th>
+          <th data-col="email">EMAIL ▲▼</th>
+          <th data-col="city">CITY ▲▼</th>
+          <th data-col="event">EVENT/CONNECTION ▲▼</th>
+          <th data-col="project">EDGELANDS PROJECT ▲▼</th>
+          <th data-col="language">LANGUAGE ▲▼</th>
+          <th data-col="experience">EXPERIENCE ▲▼</th>
+          <th data-col="expertise">EXPERTISE ▲▼</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(async function boot(){
+  const rows = await loadRows();
+
+  const nodes = rows.map((r,i)=>({
+    id:'p'+(i+1),
+    label:[r.first||'', r.last||''].filter(Boolean).join(' ').trim()||'(unnamed)',
+    first:r.first||'', last:r.last||'', email:r.email||'',
+    city:r.city||'', event:r.event||'',
+    project:r.project||'', org:r.project||'',
+    language:r.language||'', experience:r.experience||'', expertise:r.expertise||''
+  }));
+
+  let links=[];
+  const selectedIds=new Set();
+  let lastClickedIndex=null;
+  const visible=new Set(nodes.map(n=>n.id));
+
+  // DOM refs (declared once, used everywhere)
+  const $edgeRule=document.getElementById('edgeRule');
+  const $nodeColorBy=document.getElementById('nodeColorBy');
+  const $edgeColorBy=document.getElementById('edgeColorBy');
+  const $counts=document.getElementById('counts');
+  const $reset=document.getElementById('reset');
+  const $clearSel=document.getElementById('clearSel');
+  const $clearAllFilters=document.getElementById('clearAllFilters');
+  const $useSelFilter=document.getElementById('useSelFilter');
+  const $tbody=document.querySelector('#tbl tbody');
+  const $details=document.getElementById('details');
+  const $filters=document.getElementById('filters');
+
+  // Collapsibles with persistence
+  function initCollapsible(boxId, storageKey, defaultOpen=true){
+    const box=document.getElementById(boxId);
+    const btn=box.querySelector('.box-toggle');
+    const key='collapse:'+storageKey;
+    let open = localStorage.getItem(key);
+    open = open==null ? defaultOpen : (open==='true');
+    const set=(v)=>{ btn.setAttribute('aria-expanded', v); box.classList.toggle('is-closed', !v); };
+    set(open);
+    const toggle=()=>{ open=!open; set(open); localStorage.setItem(key, String(open)); };
+    btn.addEventListener('click', toggle);
+    btn.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); }});
+  }
+  initCollapsible('box-selection','selection', true);
+  initCollapsible('box-edge','edge', true);
+  initCollapsible('box-coloring','coloring', true);
+  initCollapsible('box-filters','filters', true);
+
+  // Sorting
+  let sortCol='last', sortAsc=true;
+
+  // Edges
+  function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j]]; }return a}
+  function addGroupLinks(ids,kind){
+    if(ids.length<=20){
+      for(let i=0;i<ids.length;i++) for(let j=i+1;j<ids.length;j++) links.push({source:ids[i],target:ids[j],kind})
+    } else {
+      const arr=shuffle(ids.slice());
+      for(let i=0;i<arr.length;i++) links.push({source:arr[i],target:arr[(i+1)%arr.length],kind});
+      const extra=Math.min(arr.length*2,1000);
+      for(let k=0;k<extra;k++){const s=arr[Math.floor(Math.random()*arr.length)], t=arr[Math.floor(Math.random()*arr.length)]; if(s!==t) links.push({source:s,target:t,kind})}
+    }
+  }
+  function rebuildLinks(kind){
+    links=[]; const ids=nodes.map(n=>n.id);
+    if(kind==='random'){
+      const m=Math.min(ids.length*2,600), used=new Set();
+      while(used.size<m){
+        const s=ids[Math.floor(Math.random()*ids.length)], t=ids[Math.floor(Math.random()*ids.length)];
+        if(s===t) continue; const key=s<t?`${s}|${t}`:`${t}|${s}`;
+        if(!used.has(key)){used.add(key); links.push({source:s,target:t,kind})}
+      }
+    } else {
+      const keyAttr=kind==='city'?'city':(kind==='org'?'org':'event');
+      const groups={}; nodes.forEach(n=>(groups[n[keyAttr]||'']??=[]).push(n.id));
+      Object.values(groups).forEach(list=>addGroupLinks(list,kind));
+    }
+  }
+
+  const tokenFacetKeys=new Set(['language','experience','expertise','project']);
+  const nodeTokens={}; nodes.forEach(n=>{nodeTokens[n.id]={}; for(const k of tokenFacetKeys){nodeTokens[n.id][k]=new Set((n[k]||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean))}});
+
+  const world=ForceGraph3D()(document.getElementById('3d'))
+    .graphData({nodes,links})
+    .nodeId('id')
+    .nodeLabel(n=>[n.label,[n.project,n.city].filter(Boolean).join(' — ')].filter(Boolean).join('\n'))
+    .nodeRelSize(4).nodeOpacity(0.9)
+    .linkOpacity(0.6).linkWidth(1)
+    .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim()||'#0b0b0b')
+    .onNodeClick(n=>toggleSelectById(n.id));
+
+  // One-time zoom-out on first layout; no constant re-framing.
+  function frameToBounds(mult=3.8){
+    const arr=world.graphData().nodes; if(!arr.length) return;
+    let minX=+Infinity,minY=+Infinity,minZ=+Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
+    arr.forEach(n=>{ minX=Math.min(minX,n.x||0); maxX=Math.max(maxX,n.x||0);
+                     minY=Math.min(minY,n.y||0); maxY=Math.max(maxY,n.y||0);
+                     minZ=Math.min(minZ,n.z||0); maxZ=Math.max(maxZ,n.z||0); });
+    const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2;
+    const rx=maxX-minX, ry=maxY-minY, rz=maxZ-minZ;
+    const radius=Math.max(rx,ry,rz)/2 || 120;
+    world.cameraPosition({x:cx+radius*mult, y:cy+radius*mult, z:cz+radius*mult}, {x:cx,y:cy,z:cz}, 800);
+  }
+  let didInitialFrame=false;
+  world.onEngineStop(()=>{ if(!didInitialFrame){ didInitialFrame=true; frameToBounds(4.2); }});
+
+  // Keep graph sized, but DO NOT reframe on resize
+  const graphWrap=document.getElementById('graph');
+  function resize(){ world.width(graphWrap.clientWidth).height(graphWrap.clientHeight); }
+  new ResizeObserver(resize).observe(graphWrap); resize();
+
+  // ===== Colors
+  let nodeColorMode='city';
+  let edgeColorMode='by-rule';
+
+  function nodeColor(n){
+    if (selectedIds.has(n.id)) return COL_SEL;
+    switch(nodeColorMode){
+      case 'city': {
+        const c = cityTokenColor(n.city);
+        return c || getBrandColor(n.city,'fallback');
+      }
+      case 'project': return getBrandColor(firstToken(n.project), 'project');
+      case 'language':return getBrandColor(firstToken(n.language), 'language');
+      case 'event':   return getBrandColor(n.event, 'event');
+      default:        return COL_NODE_DEFAULT;
+    }
+  }
+  function edgeColor(l){
+    const s = typeof l.source==='object'? l.source : nodes.find(n=>n.id===l.source);
+    switch(edgeColorMode){
+      case 'same-nodes': return nodeColor(s);
+      case 'by-rule':
+        if (l.kind==='city')  return cityTokenColor(s.city) || getBrandColor(s.city,'fallback');
+        if (l.kind==='org')   return getBrandColor(firstToken(s.project),'project');
+        if (l.kind==='event') return getBrandColor(s.event,'event');
+        return COL_LINK_DEFAULT;
+      default: return COL_LINK_DEFAULT;
+    }
+  }
+  function applyColors(){ world.nodeColor(nodeColor); world.linkColor(edgeColor); }
+
+  // Right panel cards
+  function renderSelectedCards(){
+    if(selectedIds.size===0){ $details.innerHTML='<div class="muted">Click a node or table row to see details here.</div>'; return; }
+    const sel=[...selectedIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean).sort((a,b)=>(a.last||'').localeCompare(b.last||''));
+    $details.innerHTML=['<div class="muted" style="margin-bottom:6px">',sel.length,' selected</div><div class="cards">', ...sel.map(n=>`
+      <div class="person-card" data-id="${n.id}">
+        <div class="pc-name">${[n.first,n.last].filter(Boolean).join(' ')||'(unnamed)'}</div>
+        ${n.email?`<div class="pc-row"><a class="pc-email" href="mailto:${n.email}">${n.email}</a></div>`:''}
+        <div class="pc-row">${[n.city,n.event].filter(Boolean).join(' · ')}</div>
+        ${n.project?`<div class="pc-row">${n.project}</div>`:''}
+        <div class="pc-tags">
+          ${n.language?`Language: ${n.language}`:''}${n.language&&(n.experience||n.expertise)?' · ':''}
+          ${n.experience?`Exp: ${n.experience}`:''}${n.experience&&n.expertise?' · ':''}
+          ${n.expertise?`Expertise: ${n.expertise}`:''}
+        </div>
+      </div>`),'</div>'].join('');
+    $details.querySelectorAll('.person-card').forEach(card=>{
+      card.addEventListener('click',()=>{const id=card.getAttribute('data-id'), n=nodes.find(x=>x.id===id); if(!n) return; world.cameraPosition({x:(n.x||0)+120,y:(n.y||0)+120,z:(n.z||0)+120},{x:n.x||0,y:n.y||0,z:n.z||0},800);});
+    });
+  }
+  function updateCounts(){
+    const visN=nodes.filter(n=>visible.has(n.id)).length;
+    const visE=links.filter(l=>visible.has(l.source.id||l.source)&&visible.has(l.target.id||l.target)).length;
+    $counts.textContent=`Visible: ${visN} nodes, ${visE} edges`;
+  }
+
+  const facetDefs=[
+    {title:'Event/Connection', key:'event', tokenized:false},
+    {title:'Edgelands Project', key:'project', tokenized:true},
+    {title:'Language', key:'language', tokenized:true},
+    {title:'Edgelands Experience', key:'experience', tokenized:true},
+    {title:'Expertise', key:'expertise', tokenized:true},
+    {title:'City', key:'city', tokenized:false},
+  ];
+  const selectedFacets=Object.fromEntries(facetDefs.map(f=>[f.key,new Set()]));
+
+  function uniqueSortedValues(def){
+    const {key,tokenized}=def, values=new Set();
+    nodes.forEach(n=>{
+      const raw=(n[key]||'').trim(); if(!raw) return;
+      if(tokenized) raw.split(TOKEN_SPLIT).forEach(p=>{const t=p.trim(); if(t) values.add(t)});
+      else values.add(raw);
+    });
+    return [...values].sort((a,b)=>a.localeCompare(b));
+  }
+
+  function makeFacet(def){
+    const values=uniqueSortedValues(def);
+    const wrap=document.createElement('div'); wrap.className='facet'; wrap.dataset.key=def.key;
+    const title=document.createElement('div'); title.className='facet-title'; title.innerHTML=`<span>${def.title}</span>`;
+    const actions=document.createElement('div'); actions.className='facet-actions';
+    const aAll=document.createElement('button'); aAll.type='button'; aAll.textContent='Select all';
+    const aClr=document.createElement('button'); aClr.type='button'; aClr.textContent='Clear';
+    actions.append(aAll,aClr); title.append(actions);
+
+    const list=document.createElement('div'); list.className='facet-list';
+    values.forEach(v=>{const id=`chk-${def.key}-${v.replace(/[^a-z0-9]+/gi,'').toLowerCase()}`; const row=document.createElement('label'); row.className='facet-item'; row.title=v; row.innerHTML=`<input type="checkbox" value="${v}" id="${id}"><span>${v}</span>`; list.appendChild(row)});
+
+    wrap.append(title,list); $filters.appendChild(wrap);
+
+    list.addEventListener('change',e=>{ if(e.target && e.target.type==='checkbox'){const val=e.target.value; if(e.target.checked) selectedFacets[def.key].add(val); else selectedFacets[def.key].delete(val); applyFilters()}});
+    aAll.onclick=()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(cb=>{cb.checked=true; selectedFacets[def.key].add(cb.value)}); applyFilters() };
+    aClr.onclick=()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); selectedFacets[def.key].clear(); applyFilters() };
+  }
+  function buildFacets(){ $filters.innerHTML=''; facetDefs.forEach(def=>makeFacet(def)) }
+
+  function rowPassesFacets(n){
+    for(const def of facetDefs){
+      const sel=selectedFacets[def.key]; if(sel.size===0) continue;
+      if(def.tokenized){ const toks=nodeTokens[n.id][def.key]||new Set(); let hit=false; for(const w of sel){ if(toks.has(w)){ hit=true; break } } if(!hit) return false; }
+      else { const val=(n[def.key]||'').trim(); if(!sel.has(val)) return false; }
+    } return true;
+  }
+
+  function applyFilters(){
+    visible.clear(); nodes.forEach(n=>{ if(rowPassesFacets(n)) visible.add(n.id) });
+    if($useSelFilter.checked && selectedIds.size>0){ for(const id of [...visible]) if(!selectedIds.has(id)) visible.delete(id) }
+    const filtered={ nodes:nodes.filter(n=>visible.has(n.id)), links:links.filter(l=>visible.has(l.source.id||l.source)&&visible.has(l.target.id||l.target)) };
+    world.graphData(filtered);
+    renderTable(); updateCounts(); applyColors();
+  }
+
+  let currentTableOrder=[];
+  function renderTable(){
+    const arr=nodes.filter(n=>visible.has(n.id)).sort((a,b)=>(a[sortCol]>b[sortCol]?(sortAsc?1:-1):(sortAsc?-1:1)));
+    currentTableOrder=arr.map(n=>n.id);
+    $tbody.innerHTML='';
+    arr.forEach((n,idx)=>{
+      const tr=document.createElement('tr'); tr.dataset.id=n.id;
+      tr.innerHTML=`<td>${n.last||""}</td><td>${n.first||""}</td><td>${n.email||""}</td><td>${n.city||""}</td><td>${n.event||""}</td><td>${n.project||""}</td><td>${n.language||""}</td><td>${n.experience||""}</td><td>${n.expertise||""}</td>`;
+      if(selectedIds.has(n.id)) tr.classList.add('selected');
+      tr.addEventListener('click',(ev)=>onRowClick(ev,n,idx)); $tbody.appendChild(tr);
+    });
+  }
+  function onRowClick(ev,node,idx){
+    if(ev.shiftKey && lastClickedIndex!=null && currentTableOrder.length){const a=Math.min(lastClickedIndex,idx), b=Math.max(lastClickedIndex,idx); for(let i=a;i<=b;i++) selectedIds.add(currentTableOrder[i])}
+    else if(ev.metaKey||ev.ctrlKey){ if(selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id); lastClickedIndex=idx }
+    else { if(selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id); lastClickedIndex=idx }
+    renderSelectedCards(); applyFilters();
+  }
+  function toggleSelectById(id){
+    if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    const tr=$tbody.querySelector(`tr[data-id="${id}"]`); if(tr) tr.scrollIntoView({block:'nearest'});
+    renderSelectedCards(); applyFilters();
+  }
+
+  // UI wiring (fixed handlers)
+  document.querySelectorAll('#tbl thead th').forEach(th=>{ th.onclick=()=>{ const c=th.dataset.col; sortAsc=(sortCol===c)?!sortAsc:true; sortCol=c; renderTable() }});
+  $edgeRule.onchange=()=>{ rebuildLinks($edgeRule.value); applyFilters() };
+  $nodeColorBy.onchange=()=>{ nodeColorMode=$nodeColorBy.value; applyColors(); };
+  $edgeColorBy.onchange=()=>{ edgeColorMode=$edgeColorBy.value; applyColors(); };
+  $useSelFilter.onchange=applyFilters;
+
+  $reset.onclick=()=>{ frameToBounds(4.2); for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) } selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
+  $clearSel.onclick=()=>{ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
+  $clearAllFilters.onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) } applyFilters() };
+
+  // Init
+  rebuildLinks($edgeRule.value);
+  buildFacets();
+  applyFilters();
+  renderTable();
+  renderSelectedCards();
+  updateCounts();
+})();
+</script>
+</body>
+</html>
