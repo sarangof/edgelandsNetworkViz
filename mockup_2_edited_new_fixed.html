@@ -5,116 +5,57 @@
   <title>3D People Network (draft)</title>
   <style>
     html, body { height:100%; margin:0; font-family: var(--font-sans, system-ui,-apple-system,Segoe UI,Roboto,sans-serif); }
-
-    /* Layout: 2 rows → top (left+graph), bottom (table full width) */
-    #layout {
+    /* Layout */
+    #layout{
       display:grid;
-      grid-template-columns: 380px 1fr;     /* left panel + graph */
-      grid-template-rows: 1fr auto;         /* top takes remaining height, bottom shrinks to content */
+      grid-template-columns:380px 1fr;
+      grid-template-rows:1fr auto;
       grid-template-areas:
         "left graph"
         "bottom bottom";
-      gap: 16px;
-      height:100%;
-      padding:12px;
-      box-sizing: border-box;
-      background: var(--app-bg, #f6f7f9);
+      gap:16px; height:100%; padding:12px; box-sizing:border-box; background:var(--app-bg,#0b0b0b);
     }
-
     /* Left panel */
-    #left {
-      grid-area: left;
-      border:1px solid var(--app-border, #e5e7eb);
-      border-radius: 14px;
-      background: var(--app-surface, #fff);
-      padding:12px;
-      overflow:auto;
-      box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
-      min-height: 420px;
+    #left{
+      grid-area:left; border:1px solid var(--app-border,#232323); border-radius:14px;
+      background:#0f0f0f; padding:12px; overflow:auto; box-shadow:0 2px 12px rgba(0,0,0,.3); color:#e5e5e5;
     }
-    h2.h2 { margin:0 0 10px; font-size:16px; font-weight:600; }
-    label { display:block; margin-top:10px; font-weight:600; }
-    select, input[type=text] {
-      width:100%; padding:8px 10px;
-      border:1px solid var(--app-border, #e5e7eb);
-      border-radius:12px;
-      background: var(--app-surface, #fff);
-      color: var(--app-text, #111827);
-    }
-    button {
-      padding:8px 12px; border-radius:999px;
-      border:1px solid var(--app-border, #e5e7eb);
-      background: transparent; color: var(--brand-accent, #0ea5e9);
-      cursor:pointer;
-    }
-    .row { display:flex; gap:8px; margin-top:10px; align-items:center; }
-    .stat { color: #6b7280; font-size:12px; margin-top:8px; }
+    h2{margin:0 0 10px;font-size:16px;font-weight:700}
+    label{display:block;margin-top:10px;font-weight:600}
+    button{padding:8px 12px;border-radius:999px;border:1px solid #2a2a2a;background:transparent;color:#d9ff4b;cursor:pointer}
+    .row{display:flex;gap:8px;margin-top:10px;align-items:center}
+    .stat{color:#9aa0a6;font-size:12px;margin-top:8px}
 
-    /* Graph area */
-    #graph.vis3d {
-      grid-area: graph;
-      position:relative;
-      background: var(--graph-background, #0e2e37);
-      border:1px solid var(--app-border, #e5e7eb);
-      border-radius: 14px;
-      box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
-      min-height: 560px;
-    }
-    #graph > div { position:absolute; inset:0; }
+    /* Facets */
+    .facet{margin-top:12px;border:1px solid #232323;border-radius:12px;background:#121212;padding:10px}
+    .facet-title{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;margin:0 0 8px}
+    .facet-actions{display:flex;gap:6px}
+    .facet-actions button{font-size:11px;padding:4px 8px}
+    .facet-list{max-height:160px;overflow:auto;padding-right:4px;display:grid;grid-template-columns:1fr;gap:6px}
+    .facet-item{display:flex;align-items:center;gap:8px;font-size:13px}
 
-    /* Details block */
-    .details {
-      font-size:13px;
-      border:1px solid var(--app-border, #e5e7eb);
-      border-radius:12px;
-      padding:10px;
-      margin-top:10px;
-      background: var(--app-surface, #fff);
-    }
-    .muted { color: #6b7280; font-size:12px; }
+    /* Details */
+    .details{font-size:13px;border:1px solid #232323;border-radius:12px;padding:10px;margin-top:10px;background:#121212}
+    .muted{color:#9aa0a6;font-size:12px}
+    .cards{display:grid;gap:10px;margin-top:8px}
+    .person-card{border:1px solid #232323;border-radius:12px;padding:10px;background:#121212;box-shadow:0 1px 6px rgba(0,0,0,.25);cursor:pointer}
+    .person-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.35)}
+    .pc-name{font-weight:700;margin:0 0 4px}
+    .pc-email{color:#8ab4f8;text-decoration:none;word-break:break-all}
+    .pc-row{font-size:12px;color:#e5e5e5;margin-top:2px}
+    .pc-tags{font-size:12px;color:#9aa0a6;margin-top:6px}
 
-    /* Person cards (selected list) */
-    .cards { display: grid; gap:10px; margin-top:8px; }
-    .person-card {
-      border:1px solid var(--app-border, #e5e7eb);
-      border-radius:12px;
-      padding:10px;
-      background: var(--app-surface, #fff);
-      box-shadow: 0 1px 6px rgba(0,0,0,.05);
-      cursor: pointer;
-    }
-    .person-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
-    .pc-name { font-weight:600; margin:0 0 4px; }
-    .pc-email { color:#2563eb; text-decoration:none; word-break: break-all; }
-    .pc-row { font-size:12px; color:#374151; margin-top:2px; }
-    .pc-tags { font-size:12px; color:#6b7280; margin-top:6px; }
+    /* Graph */
+    #graph.vis3d{grid-area:graph;position:relative;background:#0e2e37;border:1px solid #232323;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.3);min-height:560px}
+    #graph>div{position:absolute;inset:0}
 
-    /* Bottom frame for the table */
-    #bottom {
-      grid-area: bottom;
-      border:1px solid var(--app-border, #e5e7eb);
-      border-radius: 14px;
-      background: var(--app-surface, #fff);
-      box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
-      padding: 12px;
-      max-height: 40vh;            /* adjust if you want more/less height */
-      overflow: auto;              /* scrolls the table if it grows */
-    }
-    #bottom .frame-title {
-      margin: 0 0 6px;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    /* Table */
-    table.table {
-      width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;
-      background: var(--app-surface, #fff); border:1px solid var(--app-border, #e5e7eb);
-      border-radius: 12px; overflow: hidden;
-    }
-    table.table th, table.table td { border-top:1px solid var(--app-border, #e5e7eb); padding:6px 8px; text-align:left; }
-    table.table thead th { background: rgba(0,0,0,.04); position:sticky; top:0; cursor:pointer; user-select:none; }
-    tr.selected { background: rgba(14,165,233,.12); }
+    /* Bottom (table) */
+    #bottom{grid-area:bottom;border:1px solid #232323;border-radius:14px;background:#0f0f0f;box-shadow:0 2px 12px rgba(0,0,0,.3);padding:12px;max-height:40vh;overflow:auto;color:#e5e5e5}
+    #bottom .frame-title{margin:0 0 6px;font-size:14px;font-weight:700}
+    table.table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;background:#0f0f0f;border:1px solid #232323;border-radius:12px;overflow:hidden}
+    table.table th, table.table td{border-top:1px solid #232323;padding:6px 8px;text-align:left}
+    table.table thead th{background:#151515;position:sticky;top:0;cursor:pointer;user-select:none}
+    tr.selected{background:rgba(217,255,75,.12)}
   </style>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -122,52 +63,77 @@
   <link href="https://fonts.googleapis.com/css2?family=Georama:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="brand.css">
 
-  <!-- CSV Loader utilities (unchanged) -->
+  <!-- CSV Loader utilities -->
   <script>
   const CSV_DEFAULT_PATH = 'database_Sep10.csv';
+
+  // Map YOUR headers to internal keys (case/space/slash-insensitive)
   const HEADER_MAP = {
-    "Event/ Connection": "event",
-    "Last Name": "last",
-    "First Name": "first",
-    "Email": "email",
-    "Edgelands Project": "project",
-    "Idioma": "idioma",
-    "Edgelands Experience": "experience",
-    "Expertise": "expertise",
-    "City": "city"
+    "event/ connection": "event",
+    "last name": "last",
+    "first name": "first",
+    "email": "email",
+    "edgelands project": "project",
+    "language": "language",
+    "edgelands experience": "experience",
+    "expertise": "expertise",
+    "city": "city"
   };
 
-  function parseCSVLine(line) {
-    const out = []; let cur = ""; let inQ = false;
+  const norm = s => String(s||'').trim().toLowerCase().replace(/\s+|\/+/g,' ');
+
+  function detectDelimiter(text) {
+    const first = text.split(/\r?\n/).find(l => l.trim().length > 0) || "";
+    const commas = (first.match(/,/g) || []).length;
+    const semis  = (first.match(/;/g) || []).length;
+    return semis > commas ? ';' : ',';
+  }
+
+  function splitCSVLine(line, delim) {
+    const out = []; let cur = ''; let inQ = false;
     for (let i=0; i<line.length; i++) {
       const ch = line[i];
       if (inQ) {
-        if (ch === '"') { if (line[i+1] === '"') { cur += '"'; i++; } else inQ = false; }
-        else cur += ch;
+        if (ch === '"') {
+          if (line[i+1] === '"') { cur += '"'; i++; }
+          else inQ = false;
+        } else cur += ch;
       } else {
-        if (ch === ',') { out.push(cur); cur=""; }
-        else if (ch === '"') inQ = true;
+        if (ch === '"') inQ = true;
+        else if (ch === delim) { out.push(cur); cur = ''; }
         else cur += ch;
       }
     }
     out.push(cur);
     return out;
   }
+
   function parseCSV(text) {
+    const delim = detectDelimiter(text);
     const lines = text.split(/\r?\n/).filter(l => l.trim().length);
     if (!lines.length) return [];
-    const headers = parseCSVLine(lines[0]).map(h => h.trim());
+    const headerCells = splitCSVLine(lines[0], delim).map(h => norm(h));
+    const keyForCol = headerCells.map(h => HEADER_MAP[h] || h.replace(/\s+/g,'_'));
     const rows = [];
     for (let i=1; i<lines.length; i++) {
-      const cols = parseCSVLine(lines[i]);
+      const cells = splitCSVLine(lines[i], delim);
       const obj = {};
-      for (let c=0; c<headers.length; c++) {
-        const raw = headers[c] || "";
-        theKey = HEADER_MAP[raw] || raw.toLowerCase().replace(/\s+/g,'_');
-        obj[theKey] = cols[c] ?? "";
+      for (let c=0; c<headerCells.length; c++) {
+        const key = keyForCol[c];
+        obj[key] = (cells[c] ?? '').trim();
       }
-      obj.label = [obj.first, obj.last].filter(Boolean).join(" ").trim();
-      obj.org = obj.project || obj.org || "";
+      // normalize and fallbacks
+      obj.first      = obj.first      || '';
+      obj.last       = obj.last       || '';
+      obj.email      = obj.email      || '';
+      obj.project    = obj.project    || '';
+      obj.language   = obj.language   || '';
+      obj.experience = obj.experience || '';
+      obj.expertise  = obj.expertise  || '';
+      obj.city       = obj.city       || '';
+      obj.event      = obj.event      || '';
+      obj.label      = [obj.first, obj.last].filter(Boolean).join(' ').trim() || '(unnamed)';
+      obj.org        = obj.project; // keep alias for edge rules
       rows.push(obj);
     }
     return rows;
@@ -191,7 +157,7 @@
   function askUserForCSV() {
     return new Promise(resolve => {
       const banner = document.createElement('div');
-      banner.style.cssText = 'padding:10px; border:1px dashed #999; border-radius:10px; margin:8px 0;';
+      banner.style.cssText = 'padding:10px; border:1px dashed #666; border-radius:10px; margin:8px 0; color:#e5e5e5';
       banner.innerHTML = '<b>Load CSV</b> — Could not auto-load <code>database_Sep10.csv</code>. Choose a file:';
       const input = document.createElement('input');
       input.type = 'file'; input.accept = '.csv';
@@ -224,9 +190,10 @@
 <body class="theme--casual">
 <div id="layout">
   <div id="left">
-    <h2 class="h2">3D People Network</h2>
+    <h2>3D PEOPLE NETWORK</h2>
     <div class="stat" id="counts"></div>
 
+    <!-- Edges rule -->
     <label>Edges</label>
     <select id="edgeRule">
       <option value="random">Random (demo)</option>
@@ -235,16 +202,8 @@
       <option value="event">Same Event/Connection</option>
     </select>
 
-    <div class="row">
-      <div style="flex:1">
-        <label>Filter: City</label>
-        <select id="cityFilter"><option value="">(all)</option></select>
-      </div>
-      <div style="flex:1">
-        <label>Search: Organization</label>
-        <input id="orgSearch" type="text" placeholder="type to filter…"/>
-      </div>
-    </div>
+    <!-- Checkbox facets -->
+    <div id="filters"></div>
 
     <div class="row">
       <button id="reset">Reset view</button>
@@ -263,22 +222,22 @@
 
   <div id="graph" class="vis3d"><div id="3d"></div></div>
 
-  <!-- Bottom: table frame -->
+  <!-- Bottom: table -->
   <div id="bottom">
     <div class="frame-title">Table</div>
     <div class="muted" style="margin:-2px 0 6px 0;">Tip: Cmd/Ctrl-click to multi-select, Shift-click for ranges</div>
     <table id="tbl" class="table">
       <thead>
         <tr>
-          <th data-col="last">Last Name ▲▼</th>
-          <th data-col="first">First Name ▲▼</th>
-          <th data-col="email">Email ▲▼</th>
-          <th data-col="city">City ▲▼</th>
-          <th data-col="event">Event/Connection ▲▼</th>
-          <th data-col="org">Edgelands Project ▲▼</th>
-          <th data-col="idioma">Idioma ▲▼</th>
-          <th data-col="experience">Experience ▲▼</th>
-          <th data-col="expertise">Expertise ▲▼</th>
+          <th data-col="last">LAST NAME ▲▼</th>
+          <th data-col="first">FIRST NAME ▲▼</th>
+          <th data-col="email">EMAIL ▲▼</th>
+          <th data-col="city">CITY ▲▼</th>
+          <th data-col="event">EVENT/CONNECTION ▲▼</th>
+          <th data-col="project">EDGELANDS PROJECT ▲▼</th>
+          <th data-col="language">LANGUAGE ▲▼</th>
+          <th data-col="experience">EXPERIENCE ▲▼</th>
+          <th data-col="expertise">EXPERTISE ▲▼</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -286,291 +245,364 @@
   </div>
 </div>
 
-<!-- 3D Force Graph (includes three.js) -->
+<!-- 3D Force Graph -->
 <script src="https://unpkg.com/3d-force-graph"></script>
 
-<!-- Single boot script with multi-select, selection->filter toggle, and selected cards -->
+<!-- Boot script -->
 <script>
 async function boot(){
-  const rows = await loadRows();
+  try {
+    const rows = await loadRows();
 
-  // Build nodes
-  const nodes = rows.map((r, i) => ({
-    id: 'p' + (i+1),
-    label: `${r.first||''} ${r.last||''}`.trim(),
-    last: r.last, first: r.first, email: r.email,
-    city: r.city, event: r.event, org: r.project || r.org || '',
-    project: r.project, idioma: r.idioma, experience: r.experience, expertise: r.expertise
-  }));
+    // Build nodes safely (no "Undefined")
+    const nodes = rows.map((r, i) => ({
+      id: 'p' + (i+1),
+      label: [r.first||'', r.last||''].filter(Boolean).join(' ').trim() || '(unnamed)',
+      first: r.first || '',
+      last: r.last || '',
+      email: r.email || '',
+      city: r.city || '',
+      event: r.event || '',
+      project: r.project || '',
+      org: r.project || '',
+      language: r.language || '',
+      experience: r.experience || '',
+      expertise: r.expertise || ''
+    }));
 
-  let links = [];
-  const selectedIds = new Set();   // multi-select store
-  let lastClickedIndex = null;     // for Shift-click ranges
-  const visible = new Set(nodes.map(n => n.id));
+    let links = [];
+    const selectedIds = new Set();
+    let lastClickedIndex = null;
+    const visible = new Set(nodes.map(n => n.id));
 
-  // HTML refs
-  const $edgeRule = document.getElementById('edgeRule');
-  const $city = document.getElementById('cityFilter');
-  const $orgQ = document.getElementById('orgSearch');
-  const $counts = document.getElementById('counts');
-  const $reset = document.getElementById('reset');
-  const $clearSel = document.getElementById('clearSel');
-  const $useSelFilter = document.getElementById('useSelFilter');
-  const $tbody = document.querySelector('#tbl tbody');
-  const $details = document.getElementById('details');
+    // Refs (declared ONCE)
+    const $edgeRule = document.getElementById('edgeRule');
+    const $counts = document.getElementById('counts');
+    const $reset = document.getElementById('reset');
+    const $clearSel = document.getElementById('clearSel');
+    const $useSelFilter = document.getElementById('useSelFilter');
+    const $tbody = document.querySelector('#tbl tbody');
+    const $details = document.getElementById('details');
+    const $filters = document.getElementById('filters');
 
-  // City options
-  const cities = [...new Set(rows.map(r => r.city).filter(Boolean))].sort();
-  cities.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; $city.appendChild(o); });
+    // Colors
+    const css = getComputedStyle(document.documentElement);
+    const COL_NODE = css.getPropertyValue('--graph-node').trim() || '#00B08B';
+    const COL_SEL  = css.getPropertyValue('--graph-node-selected').trim() || '#DAF300';
+    const COL_LINK = css.getPropertyValue('--graph-link').trim() || 'rgba(180,180,180,0.6)';
+    function colorForCity(city) {
+      const varName = `--city-${(city || '').toLowerCase().replace(/\s+/g,'')}`;
+      const v = css.getPropertyValue(varName).trim();
+      return v || COL_NODE;
+    }
 
-  // Colors
-  const css = getComputedStyle(document.documentElement);
-  const COL_NODE = css.getPropertyValue('--graph-node').trim() || '#00B08B';
-  const COL_SEL  = css.getPropertyValue('--graph-node-selected').trim() || '#DAF300';
-  const COL_LINK = css.getPropertyValue('--graph-link').trim() || 'rgba(180,180,180,0.6)';
-  function colorForCity(city) {
-    const varName = `--city-${(city || '').toLowerCase().replace(/\s+/g,'')}`;
-    const v = css.getPropertyValue(varName).trim();
-    return v || COL_NODE;
-  }
+    // Sorting
+    let sortCol = 'last', sortAsc = true;
 
-  // Sorting
-  let sortCol = 'last', sortAsc = true;
-
-  // Edge builders
-  function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a; }
-  function addGroupLinks(ids, kind) {
-    if (ids.length <= 20) {
-      for (let i=0;i<ids.length;i++) for (let j=i+1;j<ids.length;j++) links.push({source:ids[i], target:ids[j], kind});
-    } else {
-      const arr = shuffle(ids.slice());
-      for (let i=0;i<arr.length;i++) links.push({source:arr[i], target:arr[(i+1)%arr.length], kind});
-      const extra = Math.min(arr.length * 2, 1000);
-      for (let k=0;k<extra;k++){
-        const s = arr[Math.floor(Math.random()*arr.length)];
-        const t = arr[Math.floor(Math.random()*arr.length)];
-        if (s!==t) links.push({source:s, target:t, kind});
+    // Edge builders
+    function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a; }
+    function addGroupLinks(ids, kind) {
+      if (ids.length <= 20) {
+        for (let i=0;i<ids.length;i++) for (let j=i+1;j<ids.length;j++) links.push({source:ids[i], target:ids[j], kind});
+      } else {
+        const arr = shuffle(ids.slice());
+        for (let i=0;i<arr.length;i++) links.push({source:arr[i], target:arr[(i+1)%arr.length], kind});
+        const extra = Math.min(arr.length * 2, 1000);
+        for (let k=0;k<extra;k++){
+          const s = arr[Math.floor(Math.random()*arr.length)];
+          const t = arr[Math.floor(Math.random()*arr.length)];
+          if (s!==t) links.push({source:s, target:t, kind});
+        }
       }
     }
-  }
-  function rebuildLinks(kind) {
-    links = [];
-    const ids = nodes.map(n => n.id);
-    if (kind === 'random') {
-      const m = Math.min(ids.length*2, 600);
-      const used = new Set();
-      while (used.size < m) {
-        const s = ids[Math.floor(Math.random()*(ids.length))];
-        const t = ids[Math.floor(Math.random()*(ids.length))];
-        const key = s < t ? (s + '|' + t) : (t + '|' + s);
-        if (s!==t && !used.has(key)){ used.add(key); links.push({source:s, target:t, kind}); }
+    function rebuildLinks(kind) {
+      links = [];
+      const ids = nodes.map(n => n.id);
+      if (kind === 'random') {
+        const m = Math.min(ids.length*2, 600);
+        const used = new Set();
+        while (used.size < m) {
+          const s = ids[Math.floor(Math.random()*ids.length)];
+          const t = ids[Math.floor(Math.random()*ids.length)];
+          if (s===t) continue;
+          const key = s < t ? (s + '|' + t) : (t + '|' + s);
+          if (!used.has(key)){ used.add(key); links.push({source:s, target:t, kind}); }
+        }
+      } else {
+        const keyAttr = kind==='city'?'city': (kind==='org'?'org':'event');
+        const groups = {};
+        nodes.forEach(n => (groups[n[keyAttr]||''] ??= []).push(n.id));
+        Object.values(groups).forEach(list => addGroupLinks(list, kind));
       }
-    } else {
-      const keyAttr = kind==='city'?'city': (kind==='org'?'org':'event');
-      const groups = {};
-      nodes.forEach(n => (groups[n[keyAttr]||''] ??= []).push(n.id));
-      Object.values(groups).forEach(list => addGroupLinks(list, kind));
     }
-  }
 
-  // 3D Graph
-  const world = ForceGraph3D()(document.getElementById('3d'))
-    .graphData({ nodes, links })
-    .nodeId('id')
-    .nodeLabel(n => `${n.label}\n${n.org} — ${n.city}`)
-    .nodeRelSize(4)
-    .nodeOpacity(0.9)
-    .linkOpacity(0.6)
-    .linkWidth(1)
-    .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim() || '#0e2e37')
-    .nodeColor(n => selectedIds.has(n.id) ? COL_SEL : colorForCity(n.city))
-    .linkColor(l => (selectedIds.has(l.source.id||l.source) || selectedIds.has(l.target.id||l.target)) ? COL_SEL : COL_LINK)
-    .onNodeClick(n => toggleSelectById(n.id, { meta: true }));
+    // 3D graph
+    const world = ForceGraph3D()(document.getElementById('3d'))
+      .graphData({ nodes, links })
+      .nodeId('id')
+      .nodeLabel(n => {
+        const parts = [n.label];
+        const line2 = [n.project, n.city].filter(Boolean).join(' — ');
+        if (line2) parts.push(line2);
+        return parts.join('\n');
+      })
+      .nodeRelSize(4)
+      .nodeOpacity(0.9)
+      .linkOpacity(0.6)
+      .linkWidth(1)
+      .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim() || '#0e2e37')
+      .nodeColor(n => selectedIds.has(n.id) ? COL_SEL : colorForCity(n.city))
+      .linkColor(l => (selectedIds.has(l.source.id||l.source) || selectedIds.has(l.target.id||l.target)) ? COL_SEL : COL_LINK)
+      .onNodeClick(n => toggleSelectById(n.id));
 
-  function sync3DColors(){ world.nodeColor(world.nodeColor()); world.linkColor(world.linkColor()); }
+    function sync3DColors(){ world.nodeColor(world.nodeColor()); world.linkColor(world.linkColor()); }
 
-  // Camera fly-to a node when clicking a card
-  function flyToNode(id){
-    const data = world.graphData();
-    const n = data.nodes.find(x => x.id === id);
-    if (!n || typeof n.x !== 'number') return;
-    const dist = 120; // adjust camera distance
-    world.cameraPosition(
-      { x: n.x + dist, y: n.y + dist, z: n.z + dist },
-      { x: n.x, y: n.y, z: n.z },
-      800
-    );
-  }
+    // Camera fly-to
+    function flyToNode(id){
+      const data = world.graphData();
+      const n = data.nodes.find(x => x.id === id);
+      if (!n || typeof n.x !== 'number') return;
+      const dist = 120;
+      world.cameraPosition(
+        { x: n.x + dist, y: n.y + dist, z: n.z + dist },
+        { x: n.x, y: n.y, z: n.z },
+        800
+      );
+    }
 
-  function renderSelectedCards(){
-    if (selectedIds.size === 0) return false;
+    // Selected cards
+    function renderSelectedCards(){
+      if (selectedIds.size === 0) return false;
+      const selected = [...selectedIds]
+        .map(id => nodes.find(n => n.id === id))
+        .filter(Boolean)
+        .sort((a,b)=> (a.last || '').localeCompare(b.last || '') );
 
-    // build cards HTML
-    const selected = [...selectedIds]
-      .map(id => nodes.find(n => n.id === id))
-      .filter(Boolean)
-      .sort((a,b)=> (a.last || '').localeCompare(b.last || '') );
-
-    const cardsHTML = [
-      `<div class="muted" style="margin-bottom:6px">${selected.length} selected</div>`,
-      `<div class="cards">`,
-      ...selected.map(n => `
-        <div class="person-card" data-id="${n.id}">
-          <div class="pc-name">${n.first||''} ${n.last||''}</div>
-          ${n.email ? `<div class="pc-row"><a class="pc-email" href="mailto:${n.email}">${n.email}</a></div>` : ''}
-          <div class="pc-row">${n.city||''}${n.city && n.event ? ' · ' : ''}${n.event||''}</div>
-          ${n.org ? `<div class="pc-row">${n.org}</div>` : ''}
-          <div class="pc-tags">
-            ${n.idioma ? `Idioma: ${n.idioma}` : ''}${n.idioma && (n.experience||n.expertise) ? ' · ' : ''}
-            ${n.experience ? `Exp: ${n.experience}` : ''}${n.experience && n.expertise ? ' · ' : ''}
-            ${n.expertise ? `Expertise: ${n.expertise}` : ''}
+      const cardsHTML = [
+        `<div class="muted" style="margin-bottom:6px">${selected.length} selected</div>`,
+        `<div class="cards">`,
+        ...selected.map(n => `
+          <div class="person-card" data-id="${n.id}">
+            <div class="pc-name">${[n.first,n.last].filter(Boolean).join(' ') || '(unnamed)'}</div>
+            ${n.email ? `<div class="pc-row"><a class="pc-email" href="mailto:${n.email}">${n.email}</a></div>` : ''}
+            <div class="pc-row">${[n.city,n.event].filter(Boolean).join(' · ')}</div>
+            ${n.project ? `<div class="pc-row">${n.project}</div>` : ''}
+            <div class="pc-tags">
+              ${n.language ? `Language: ${n.language}` : ''}${n.language && (n.experience||n.expertise) ? ' · ' : ''}
+              ${n.experience ? `Exp: ${n.experience}` : ''}${n.experience && n.expertise ? ' · ' : ''}
+              ${n.expertise ? `Expertise: ${n.expertise}` : ''}
+            </div>
           </div>
-        </div>
-      `),
-      `</div>`
-    ].join('');
-
-    $details.innerHTML = cardsHTML;
-
-    // wire up card clicks: fly to node & keep selection
-    $details.querySelectorAll('.person-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const id = card.getAttribute('data-id');
-        flyToNode(id);
+        `),
+        `</div>`
+      ].join('');
+      $details.innerHTML = cardsHTML;
+      $details.querySelectorAll('.person-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const id = card.getAttribute('data-id');
+          flyToNode(id);
+        });
       });
-    });
-
-    return true;
-  }
-
-  function updateDetails(){
-    // If there are selected items, show the selected list as cards
-    if (selectedIds.size > 0) {
-      renderSelectedCards();
-      return;
+      return true;
     }
-    // Otherwise default message
-    $details.innerHTML = '<div class="muted">Click a node or table row to see details here.</div>';
-  }
-
-  function updateCounts(){
-    const visN = nodes.filter(n => visible.has(n.id)).length;
-    const visE = links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target)).length;
-    $counts.textContent = `Visible: ${visN} nodes, ${visE} edges`;
-  }
-
-  // Filters
-  function applyFilters(){
-    visible.clear();
-    const city = $city.value;
-    const q = $orgQ.value.trim().toLowerCase();
-
-    // base visibility from form filters
-    nodes.forEach(n => {
-      const okCity = !city || n.city===city;
-      const okOrg = !q || (n.org||'').toLowerCase().includes(q);
-      if (okCity && okOrg) visible.add(n.id);
-    });
-
-    // only narrow by selection when the toggle is ON
-    if ($useSelFilter.checked && selectedIds.size > 0) {
-      for (const id of [...visible]) if (!selectedIds.has(id)) visible.delete(id);
+    function updateDetails(){
+      if (selectedIds.size > 0) { renderSelectedCards(); return; }
+      $details.innerHTML = '<div class="muted">Click a node or table row to see details here.</div>';
+    }
+    function updateCounts(){
+      const visN = nodes.filter(n => visible.has(n.id)).length;
+      const visE = links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target)).length;
+      $counts.textContent = `Visible: ${visN} nodes, ${visE} edges`;
     }
 
-    const filtered = {
-      nodes: nodes.filter(n => visible.has(n.id)),
-      links: links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target))
-    };
-    world.graphData(filtered);
-    renderTable(); updateCounts(); sync3DColors();
-  }
+    /* Facets: OR within facet, AND across facets */
+    const facetDefs = [
+      { title: 'Event/Connection',     key: 'event' },
+      { title: 'Edgelands Project',    key: 'project' },
+      { title: 'Language',             key: 'language' },
+      { title: 'Edgelands Experience', key: 'experience' },
+      { title: 'Expertise',            key: 'expertise' },
+      { title: 'City',                 key: 'city' },
+    ];
+    const selectedFacets = Object.fromEntries(facetDefs.map(f => [f.key, new Set()]));
 
-  // Table (with multi-select)
-  let currentTableOrder = []; // node IDs in current render order
-
-  function renderTable(){
-    const city = $city.value;
-    const q = $orgQ.value.trim().toLowerCase();
-
-    const arr = nodes
-      .filter(n => (!city || n.city===city) && (!q || (n.org||'').toLowerCase().includes(q)) && visible.has(n.id))
-      .sort((a,b)=> (a[sortCol] > b[sortCol] ? (sortAsc?1:-1) : (sortAsc?-1:1)));
-
-    currentTableOrder = arr.map(n => n.id);
-
-    $tbody.innerHTML = '';
-    arr.forEach((n, idx) => {
-      const tr = document.createElement('tr');
-      tr.dataset.id = n.id;
-      tr.innerHTML = `<td>${n.last||""}</td><td>${n.first||""}</td><td>${n.email||""}</td><td>${n.city||""}</td><td>${n.event||""}</td><td>${n.org||""}</td><td>${n.idioma||""}</td><td>${n.experience||""}</td><td>${n.expertise||""}</td>`;
-      if (selectedIds.has(n.id)) tr.classList.add('selected');
-      tr.addEventListener('click', (ev) => onRowClick(ev, n, idx));
-      $tbody.appendChild(tr);
-    });
-  }
-
-  function onRowClick(ev, node, idx){
-    // Shift = range select
-    if (ev.shiftKey && lastClickedIndex != null && currentTableOrder.length) {
-      const a = Math.min(lastClickedIndex, idx);
-      const b = Math.max(lastClickedIndex, idx);
-      for (let i=a; i<=b; i++) selectedIds.add(currentTableOrder[i]);
-    } else if (ev.metaKey || ev.ctrlKey) {
-      // Cmd/Ctrl = toggle
-      if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
-      lastClickedIndex = idx;
-    } else {
-      // Plain click = toggle
-      if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
-      lastClickedIndex = idx;
+    function uniqueSorted(key){
+      return [...new Set(nodes.map(n => (n[key] || '').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     }
-    updateDetails();
-    applyFilters();
-  }
 
-  function toggleSelectById(id, opts={}) {
-    // From 3D node clicks
-    if (opts.meta || selectedIds.size===0) {
-      if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
-    } else {
-      if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    function makeFacet({title, key}, values){
+      const wrap = document.createElement('div');
+      wrap.className = 'facet'; wrap.dataset.key = key;
+
+      const titleRow = document.createElement('div');
+      titleRow.className = 'facet-title';
+      titleRow.innerHTML = `<span>${title}</span>`;
+      const actions = document.createElement('div');
+      actions.className = 'facet-actions';
+      const btnAll = document.createElement('button'); btnAll.type='button'; btnAll.textContent='Select all';
+      const btnClr = document.createElement('button'); btnClr.type='button'; btnClr.textContent='Clear';
+      actions.append(btnAll, btnClr);
+      titleRow.append(actions);
+
+      const list = document.createElement('div');
+      list.className = 'facet-list';
+
+      values.forEach(v => {
+        const id = `chk-${key}-${v.replace(/[^a-z0-9]+/gi,'').toLowerCase()}`;
+        const row = document.createElement('label'); row.className = 'facet-item'; row.setAttribute('title', v);
+        row.innerHTML = `<input type="checkbox" value="${v}" id="${id}"><span>${v}</span>`;
+        list.appendChild(row);
+      });
+
+      wrap.append(titleRow, list);
+      $filters.appendChild(wrap);
+
+      list.addEventListener('change', (e)=>{
+        if (e.target && e.target.type === 'checkbox') {
+          const val = e.target.value;
+          if (e.target.checked) selectedFacets[key].add(val);
+          else selectedFacets[key].delete(val);
+          applyFilters();
+        }
+      });
+      btnAll.onclick = ()=>{
+        list.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; selectedFacets[key].add(cb.value); });
+        applyFilters();
+      };
+      btnClr.onclick = ()=>{
+        list.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        selectedFacets[key].clear();
+        applyFilters();
+      };
     }
-    const tr = $tbody.querySelector(`tr[data-id="${id}"]`);
-    if (tr) tr.scrollIntoView({ block: 'nearest' });
-    updateDetails();
-    applyFilters();
-  }
+    function buildFacets(){
+      $filters.innerHTML = '';
+      facetDefs.forEach(def => makeFacet(def, uniqueSorted(def.key)));
+    }
 
-  // UI
-  document.querySelectorAll('#tbl thead th').forEach(th=>{
-    th.onclick = ()=>{ const c=th.dataset.col; sortAsc = (sortCol===c)? !sortAsc : true; sortCol=c; renderTable(); };
-  });
+    function rowPassesFacets(n){
+      for (const {key} of facetDefs) {
+        const sel = selectedFacets[key];
+        if (sel.size === 0) continue;
+        const val = (n[key] || '').trim();
+        if (!sel.has(val)) return false;
+      }
+      return true;
+    }
 
-  $edgeRule.onchange = ()=>{ rebuildLinks($edgeRule.value); applyFilters(); };
-  $city.onchange     = applyFilters;
-  $orgQ.oninput      = applyFilters;
+    function applyFilters(){
+      visible.clear();
+      nodes.forEach(n => { if (rowPassesFacets(n)) visible.add(n.id); });
 
-  // Toggle selection filtering
-  $useSelFilter.onchange = applyFilters;
+      if ($useSelFilter.checked && selectedIds.size > 0) {
+        for (const id of [...visible]) if (!selectedIds.has(id)) visible.delete(id);
+      }
 
-  // Optional: Cmd/Ctrl + F toggles the selection filter
-  document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-      e.preventDefault();
-      $useSelFilter.checked = !$useSelFilter.checked;
+      const filtered = {
+        nodes: nodes.filter(n => visible.has(n.id)),
+        links: links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target))
+      };
+      world.graphData(filtered);
+      renderTable(); updateCounts(); sync3DColors();
+    }
+
+    // Table + selection
+    let currentTableOrder = [];
+    function renderTable(){
+      const arr = nodes
+        .filter(n => visible.has(n.id))
+        .sort((a,b)=> (a[sortCol] > b[sortCol] ? (sortAsc?1:-1) : (sortAsc?-1:1)));
+      currentTableOrder = arr.map(n => n.id);
+
+      $tbody.innerHTML = '';
+      arr.forEach((n, idx) => {
+        const tr = document.createElement('tr');
+        tr.dataset.id = n.id;
+        tr.innerHTML = `
+          <td>${n.last||""}</td>
+          <td>${n.first||""}</td>
+          <td>${n.email||""}</td>
+          <td>${n.city||""}</td>
+          <td>${n.event||""}</td>
+          <td>${n.project||""}</td>
+          <td>${n.language||""}</td>
+          <td>${n.experience||""}</td>
+          <td>${n.expertise||""}</td>
+        `;
+        if (selectedIds.has(n.id)) tr.classList.add('selected');
+        tr.addEventListener('click', (ev) => onRowClick(ev, n, idx));
+        $tbody.appendChild(tr);
+      });
+    }
+
+    function onRowClick(ev, node, idx){
+      if (ev.shiftKey && lastClickedIndex != null && currentTableOrder.length) {
+        const a = Math.min(lastClickedIndex, idx);
+        const b = Math.max(lastClickedIndex, idx);
+        for (let i=a; i<=b; i++) selectedIds.add(currentTableOrder[i]);
+      } else if (ev.metaKey || ev.ctrlKey) {
+        if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
+        lastClickedIndex = idx;
+      } else {
+        if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
+        lastClickedIndex = idx;
+      }
+      updateDetails();
       applyFilters();
     }
-  });
 
-  $reset.onclick     = ()=>{ world.zoomToFit(400); $city.value=""; $orgQ.value=""; selectedIds.clear(); lastClickedIndex=null; updateDetails(); applyFilters(); };
-  $clearSel.onclick  = ()=>{ selectedIds.clear(); lastClickedIndex=null; updateDetails(); applyFilters(); };
+    function toggleSelectById(id) {
+      if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+      const tr = $tbody.querySelector(`tr[data-id="${id}"]`);
+      if (tr) tr.scrollIntoView({ block: 'nearest' });
+      updateDetails();
+      applyFilters();
+    }
 
-  // Init
-  rebuildLinks($edgeRule.value);
-  applyFilters();
-  renderTable();
-  updateDetails();
-  updateCounts();
+    // UI wiring
+    document.querySelectorAll('#tbl thead th').forEach(th=>{
+      th.onclick = ()=>{ const c=th.dataset.col; sortAsc = (sortCol===c)? !sortAsc : true; sortCol=c; renderTable(); };
+    });
+    $edgeRule.onchange = ()=>{ rebuildLinks($edgeRule.value); applyFilters(); };
+    $useSelFilter.onchange = applyFilters;
+
+    // Shortcuts
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        $useSelFilter.checked = !$useSelFilter.checked;
+        applyFilters();
+      }
+    });
+
+    $reset.onclick = ()=>{
+      world.zoomToFit(400);
+      for (const {key} of facetDefs) {
+        selectedFacets[key].clear();
+        const wrap = $filters.querySelector(`.facet[data-key="${key}"]`);
+        if (wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      }
+      selectedIds.clear(); lastClickedIndex=null;
+      updateDetails(); applyFilters();
+    };
+    $clearSel.onclick = ()=>{ selectedIds.clear(); lastClickedIndex=null; updateDetails(); applyFilters(); };
+
+    // Init
+    rebuildLinks($edgeRule.value);
+    buildFacets();
+    applyFilters();
+    renderTable();
+    updateDetails();
+    updateCounts();
+
+  } catch (err) {
+    console.error(err);
+    const left = document.getElementById('left');
+    const box = document.createElement('div');
+    box.className = 'details';
+    box.innerHTML = `<div class="muted">Error: ${err.message}. If the CSV didn’t load, place <code>${CSV_DEFAULT_PATH}</code> next to this HTML or use the file picker above.</div>`;
+    left.appendChild(box);
+  }
 }
 boot();
 </script>
