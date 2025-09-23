@@ -1,0 +1,442 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>3D People Network (draft)</title>
+<style>
+  html, body { height:100%; margin:0; font-family: var(--font-sans, system-ui,-apple-system,Segoe UI,Roboto,sans-serif); }
+
+  /* Layout: 2 rows → top (left+graph), bottom (table full width) */
+  #layout {
+    display:grid;
+    grid-template-columns: 380px 1fr;     /* left panel + graph */
+    grid-template-rows: 1fr auto;         /* top takes remaining height, bottom shrinks to content */
+    grid-template-areas:
+      "left graph"
+      "bottom bottom";
+    gap: 16px;
+    height:100%;
+    padding:12px;
+    box-sizing: border-box;
+    background: var(--app-bg, #f6f7f9);
+  }
+
+  /* Left panel */
+  #left {
+    grid-area: left;
+    border:1px solid var(--app-border, #e5e7eb);
+    border-radius: 14px;
+    background: var(--app-surface, #fff);
+    padding:12px;
+    overflow:auto;
+    box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
+    min-height: 420px;
+  }
+  h2.h2 { margin:0 0 10px; font-size:16px; font-weight:600; }
+  label { display:block; margin-top:10px; font-weight:600; }
+  select, input[type=text] {
+    width:100%; padding:8px 10px;
+    border:1px solid var(--app-border, #e5e7eb);
+    border-radius:12px;
+    background: var(--app-surface, #fff);
+    color: var(--app-text, #111827);
+  }
+  button {
+    padding:8px 12px; border-radius:999px;
+    border:1px solid var(--app-border, #e5e7eb);
+    background: transparent; color: var(--brand-accent, #0ea5e9);
+    cursor:pointer;
+  }
+  .row { display:flex; gap:8px; margin-top:10px; align-items:center; }
+  .stat { color: #6b7280; font-size:12px; margin-top:8px; }
+
+  /* Graph area */
+  #graph.vis3d {
+    grid-area: graph;
+    position:relative;
+    background: var(--graph-background, #0e2e37);
+    border:1px solid var(--app-border, #e5e7eb);
+    border-radius: 14px;
+    box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
+    min-height: 560px;
+  }
+  #graph > div { position:absolute; inset:0; }
+
+  /* Details block */
+  .details {
+    font-size:13px;
+    border:1px solid var(--app-border, #e5e7eb);
+    border-radius:12px;
+    padding:10px;
+    margin-top:10px;
+    background: var(--app-surface, #fff);
+  }
+  .muted { color: #6b7280; font-size:12px; }
+
+  /* Bottom frame for the table */
+  #bottom {
+    grid-area: bottom;
+    border:1px solid var(--app-border, #e5e7eb);
+    border-radius: 14px;
+    background: var(--app-surface, #fff);
+    box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
+    padding: 12px;
+    max-height: 40vh;            /* adjust if you want more/less height */
+    overflow: auto;              /* scrolls the table if it grows */
+  }
+  #bottom .frame-title {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* Table */
+  table.table {
+    width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;
+    background: var(--app-surface, #fff); border:1px solid var(--app-border, #e5e7eb);
+    border-radius: 12px; overflow: hidden;
+  }
+  table.table th, table.table td { border-top:1px solid var(--app-border, #e5e7eb); padding:6px 8px; text-align:left; }
+  table.table thead th { background: rgba(0,0,0,.04); position:sticky; top:0; cursor:pointer; }
+  tr.selected { background: rgba(14,165,233,.12); }
+</style>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Georama:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css">
+
+<!-- CSV Loader utilities -->
+<script>
+const CSV_DEFAULT_PATH = 'database_Sep10.csv';
+const HEADER_MAP = {
+  "Event/ Connection": "event",
+  "Last Name": "last",
+  "First Name": "first",
+  "Email": "email",
+  "Edgelands Project": "project",
+  "Idioma": "idioma",
+  "Edgelands Experience": "experience",
+  "Expertise": "expertise",
+  "City": "city"
+};
+
+function parseCSVLine(line) {
+  const out = []; let cur = ""; let inQ = false;
+  for (let i=0; i<line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"') { if (line[i+1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else {
+      if (ch === ',') { out.push(cur); cur=""; }
+      else if (ch === '"') inQ = true;
+      else cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+  if (!lines.length) return [];
+  const headers = parseCSVLine(lines[0]).map(h => h.trim());
+  const rows = [];
+  for (let i=1; i<lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    const obj = {};
+    for (let c=0; c<headers.length; c++) {
+      const raw = headers[c] || "";
+      const key = HEADER_MAP[raw] || raw.toLowerCase().replace(/\s+/g,'_');
+      obj[key] = cols[c] ?? "";
+    }
+    obj.label = [obj.first, obj.last].filter(Boolean).join(" ").trim();
+    obj.org = obj.project || obj.org || "";
+    rows.push(obj);
+  }
+  return rows;
+}
+
+async function tryFetchCSV(path) {
+  try {
+    const res = await fetch(path, {cache:'no-cache'});
+    if (!res.ok) throw new Error('not ok');
+    const txt = await res.text();
+    const rows = parseCSV(txt);
+    if (!rows.length) throw new Error('empty csv');
+    console.log('Loaded CSV via fetch:', path, rows.length, 'rows');
+    return rows;
+  } catch (e) {
+    console.warn('Fetch CSV failed:', e);
+    return null;
+  }
+}
+
+function askUserForCSV() {
+  return new Promise(resolve => {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'padding:10px; border:1px dashed #999; border-radius:10px; margin:8px 0;';
+    banner.innerHTML = '<b>Load CSV</b> — Could not auto-load <code>database_Sep10.csv</code>. Choose a file:';
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.csv';
+    input.style.marginLeft = '10px';
+    input.onchange = (ev) => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const txt = reader.result;
+        const rows = parseCSV(txt);
+        console.log('Loaded CSV via file picker:', rows.length, 'rows');
+        banner.remove();
+        resolve(rows);
+      };
+      reader.readAsText(file);
+    };
+    banner.appendChild(input);
+    (document.getElementById('left') || document.body).insertBefore(banner, (document.getElementById('left') || document.body).firstChild);
+  });
+}
+
+async function loadRows() {
+  const viaFetch = await tryFetchCSV(CSV_DEFAULT_PATH);
+  if (viaFetch && viaFetch.length) return viaFetch;
+  return await askUserForCSV();
+}
+</script>
+</head>
+<body class="theme--casual">
+<div id="layout">
+  <div id="left">
+    <h2 class="h2">3D People Network</h2>
+    <div class="stat" id="counts"></div>
+
+    <label>Edges</label>
+    <select id="edgeRule">
+      <option value="random">Random (demo)</option>
+      <option value="city">Same City</option>
+      <option value="org">Same Organization/Project</option>
+      <option value="event">Same Event/Connection</option>
+    </select>
+
+    <div class="row">
+      <div style="flex:1">
+        <label>Filter: City</label>
+        <select id="cityFilter"><option value="">(all)</option></select>
+      </div>
+      <div style="flex:1">
+        <label>Search: Organization</label>
+        <input id="orgSearch" type="text" placeholder="type to filter…"/>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="reset">Reset view</button>
+      <button id="clearSel">Clear selection</button>
+    </div>
+
+    <div class="details" id="details">
+      <div class="muted">Click a node or table row to see details here.</div>
+    </div>
+  </div>
+
+  <div id="graph" class="vis3d"><div id="3d"></div></div>
+
+  <!-- NEW: bottom frame with the table -->
+  <div id="bottom">
+    <div class="frame-title">Table</div>
+    <table id="tbl" class="table">
+      <thead>
+        <tr>
+          <th data-col="last">Last Name ▲▼</th>
+          <th data-col="first">First Name ▲▼</th>
+          <th data-col="email">Email ▲▼</th>
+          <th data-col="city">City ▲▼</th>
+          <th data-col="event">Event/Connection ▲▼</th>
+          <th data-col="org">Edgelands Project ▲▼</th>
+          <th data-col="idioma">Idioma ▲▼</th>
+          <th data-col="experience">Experience ▲▼</th>
+          <th data-col="expertise">Expertise ▲▼</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 3D Force Graph (includes three.js) -->
+<script src="https://unpkg.com/3d-force-graph"></script>
+
+<script>
+async function boot(){
+  const rows = await loadRows();
+
+  // Build nodes
+  const nodes = rows.map((r, i) => ({
+    id: 'p' + (i+1),
+    label: `${r.first||''} ${r.last||''}`.trim(),
+    last: r.last, first: r.first, email: r.email,
+    city: r.city, event: r.event, org: r.project || r.org || '',
+    project: r.project, idioma: r.idioma, experience: r.experience, expertise: r.expertise
+  }));
+
+  let links = [];
+  let selectedId = null;
+  const visible = new Set(nodes.map(n => n.id));
+
+  // HTML refs
+  const $edgeRule = document.getElementById('edgeRule');
+  const $city = document.getElementById('cityFilter');
+  const $orgQ = document.getElementById('orgSearch');
+  const $counts = document.getElementById('counts');
+  const $reset = document.getElementById('reset');
+  const $clearSel = document.getElementById('clearSel');
+  const $tbody = document.querySelector('#tbl tbody');
+  const $details = document.getElementById('details');
+
+  // City options
+  const cities = [...new Set(rows.map(r => r.city).filter(Boolean))].sort();
+  cities.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; $city.appendChild(o); });
+
+  // Colors
+  const css = getComputedStyle(document.documentElement);
+  const COL_NODE = css.getPropertyValue('--graph-node').trim() || '#00B08B';
+  const COL_SEL  = css.getPropertyValue('--graph-node-selected').trim() || '#DAF300';
+  const COL_LINK = css.getPropertyValue('--graph-link').trim() || 'rgba(180,180,180,0.6)';
+  function colorForCity(city) {
+    const varName = `--city-${(city || '').toLowerCase().replace(/\s+/g,'')}`;
+    const v = css.getPropertyValue(varName).trim();
+    return v || COL_NODE;
+  }
+
+  // Sorting
+  let sortCol = 'last', sortAsc = true;
+
+  // Edge builders
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a; }
+  function addGroupLinks(ids, kind) {
+    if (ids.length <= 20) {
+      for (let i=0;i<ids.length;i++) for (let j=i+1;j<ids.length;j++) links.push({source:ids[i], target:ids[j], kind});
+    } else {
+      const arr = shuffle(ids.slice());
+      for (let i=0;i<arr.length;i++) links.push({source:arr[i], target:arr[(i+1)%arr.length], kind});
+      const extra = Math.min(arr.length * 2, 1000);
+      for (let k=0;k<extra;k++){
+        const s = arr[Math.floor(Math.random()*arr.length)];
+        const t = arr[Math.floor(Math.random()*arr.length)];
+        if (s!==t) links.push({source:s, target:t, kind});
+      }
+    }
+  }
+  function rebuildLinks(kind) {
+    links = [];
+    const ids = nodes.map(n => n.id);
+    if (kind === 'random') {
+      const m = Math.min(ids.length*2, 600);
+      const used = new Set();
+      while (used.size < m) {
+        const s = ids[Math.floor(Math.random()*ids.length)];
+        const t = ids[Math.floor(Math.random()*ids.length)];
+        const key = s < t ? (s + '|' + t) : (t + '|' + s);
+        if (s!==t && !used.has(key)){ used.add(key); links.push({source:s, target:t, kind}); }
+      }
+    } else {
+      const keyAttr = kind==='city'?'city': (kind==='org'?'org':'event');
+      const groups = {};
+      nodes.forEach(n => (groups[n[keyAttr]||''] ??= []).push(n.id));
+      Object.values(groups).forEach(list => addGroupLinks(list, kind));
+    }
+  }
+
+  // 3D Graph
+  const world = ForceGraph3D()(document.getElementById('3d'))
+    .graphData({ nodes, links })
+    .nodeId('id')
+    .nodeLabel(n => `${n.label}\n${n.org} — ${n.city}`)
+    .nodeRelSize(4)
+    .nodeOpacity(0.9)
+    .linkOpacity(0.6)
+    .linkWidth(1)
+    .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim() || '#0e2e37')
+    .nodeColor(n => (n.id === selectedId) ? COL_SEL : colorForCity(n.city))
+    .linkColor(l => (l.source.id === selectedId || l.target.id === selectedId) ? COL_SEL : COL_LINK)
+    .onNodeClick(n => focusNode(n.id));
+
+  function refit() { world.graphData({ nodes: nodes, links: links }); updateCounts(); }
+  function focusNode(id) {
+    selectedId = id;
+    const n = nodes.find(x => x.id===id);
+    if (!n) return;
+    $details.innerHTML = `
+      <div><strong>${n.first||''} ${n.last||''}</strong></div>
+      <div class="muted">${n.email||''}</div>
+      <div>${n.city||''} · ${n.event||''}</div>
+      <div>${n.org||''}</div>`;
+    world.nodeColor(world.nodeColor());
+    world.linkColor(world.linkColor());
+  }
+  function updateCounts(){
+    const visN = nodes.filter(n => visible.has(n.id)).length;
+    const visE = links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target)).length;
+    $counts.textContent = `Visible: ${visN} nodes, ${visE} edges`;
+  }
+
+  // Filters
+  function applyFilters(){
+    visible.clear();
+    const city = $city.value;
+    const q = $orgQ.value.trim().toLowerCase();
+    nodes.forEach(n => {
+      const okCity = !city || n.city===city;
+      const okOrg = !q || (n.org||'').toLowerCase().includes(q);
+      if (okCity && okOrg) visible.add(n.id);
+    });
+    const filtered = {
+      nodes: nodes.filter(n => visible.has(n.id)),
+      links: links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target))
+    };
+    world.graphData(filtered);
+    renderTable(); updateCounts();
+  }
+
+  // Table
+  function renderTable(){
+    const q = $orgQ.value.trim().toLowerCase();
+    const city = $city.value;
+    const arr = nodes
+      .filter(n => (!city || n.city===city) && (!q || (n.org||'').toLowerCase().includes(q)) && visible.has(n.id))
+      .sort((a,b)=> (a[sortCol] > b[sortCol] ? (sortAsc?1:-1) : (sortAsc?-1:1)));
+    $tbody.innerHTML = '';
+    arr.forEach(n => {
+      const tr = document.createElement('tr');
+      tr.dataset.id = n.id;
+      tr.innerHTML = `<td>${n.last||""}</td><td>${n.first||""}</td><td>${n.email||""}</td><td>${n.city||""}</td><td>${n.event||""}</td><td>${n.org||""}</td><td>${n.idioma||""}</td><td>${n.experience||""}</td><td>${n.expertise||""}</td>`;
+      tr.onclick = () => focusNode(n.id);
+      if (n.id===selectedId) tr.classList.add('selected');
+      $tbody.appendChild(tr);
+    });
+  }
+
+  // UI
+  document.querySelectorAll('#tbl thead th').forEach(th=>{
+    th.onclick = ()=>{ const c=th.dataset.col; sortAsc = (sortCol===c)? !sortAsc : true; sortCol=c; renderTable(); };
+  });
+  const $edgeHeaders = document.querySelectorAll('th[data-col]');
+  $edgeHeaders.forEach(th => { th.style.userSelect = 'none'; });
+
+  $edgeRule.onchange = ()=>{ rebuildLinks($edgeRule.value); applyFilters(); };
+  $city.onchange     = applyFilters;
+  $orgQ.oninput      = applyFilters;
+  $reset.onclick     = ()=>{ world.zoomToFit(400); $city.value=""; $orgQ.value=""; applyFilters(); };
+  $clearSel.onclick  = ()=>{ selectedId=null; $details.innerHTML='<div class="muted">Click a node or table row to see details here.</div>'; world.nodeColor(world.nodeColor()); world.linkColor(world.linkColor()); renderTable(); };
+
+  // Init
+  rebuildLinks($edgeRule.value);
+  applyFilters();
+  renderTable();
+  updateCounts();
+}
+boot();
+</script>
+</body>
+</html>
