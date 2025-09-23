@@ -3,207 +3,223 @@
 <head>
   <meta charset="utf-8"/>
   <title>3D People Network (draft)</title>
-<style>
-  html, body { height:100%; margin:0; font-family: var(--font-sans, system-ui,-apple-system,Segoe UI,Roboto,sans-serif); }
+  <style>
+    html, body { height:100%; margin:0; font-family: var(--font-sans, system-ui,-apple-system,Segoe UI,Roboto,sans-serif); }
 
-  /* Layout: 2 rows → top (left+graph), bottom (table full width) */
-  #layout {
-    display:grid;
-    grid-template-columns: 380px 1fr;     /* left panel + graph */
-    grid-template-rows: 1fr auto;         /* top takes remaining height, bottom shrinks to content */
-    grid-template-areas:
-      "left graph"
-      "bottom bottom";
-    gap: 16px;
-    height:100%;
-    padding:12px;
-    box-sizing: border-box;
-    background: var(--app-bg, #f6f7f9);
-  }
+    /* Layout: 2 rows → top (left+graph), bottom (table full width) */
+    #layout {
+      display:grid;
+      grid-template-columns: 380px 1fr;     /* left panel + graph */
+      grid-template-rows: 1fr auto;         /* top takes remaining height, bottom shrinks to content */
+      grid-template-areas:
+        "left graph"
+        "bottom bottom";
+      gap: 16px;
+      height:100%;
+      padding:12px;
+      box-sizing: border-box;
+      background: var(--app-bg, #f6f7f9);
+    }
 
-  /* Left panel */
-  #left {
-    grid-area: left;
-    border:1px solid var(--app-border, #e5e7eb);
-    border-radius: 14px;
-    background: var(--app-surface, #fff);
-    padding:12px;
-    overflow:auto;
-    box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
-    min-height: 420px;
-  }
-  h2.h2 { margin:0 0 10px; font-size:16px; font-weight:600; }
-  label { display:block; margin-top:10px; font-weight:600; }
-  select, input[type=text] {
-    width:100%; padding:8px 10px;
-    border:1px solid var(--app-border, #e5e7eb);
-    border-radius:12px;
-    background: var(--app-surface, #fff);
-    color: var(--app-text, #111827);
-  }
-  button {
-    padding:8px 12px; border-radius:999px;
-    border:1px solid var(--app-border, #e5e7eb);
-    background: transparent; color: var(--brand-accent, #0ea5e9);
-    cursor:pointer;
-  }
-  .row { display:flex; gap:8px; margin-top:10px; align-items:center; }
-  .stat { color: #6b7280; font-size:12px; margin-top:8px; }
+    /* Left panel */
+    #left {
+      grid-area: left;
+      border:1px solid var(--app-border, #e5e7eb);
+      border-radius: 14px;
+      background: var(--app-surface, #fff);
+      padding:12px;
+      overflow:auto;
+      box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
+      min-height: 420px;
+    }
+    h2.h2 { margin:0 0 10px; font-size:16px; font-weight:600; }
+    label { display:block; margin-top:10px; font-weight:600; }
+    select, input[type=text] {
+      width:100%; padding:8px 10px;
+      border:1px solid var(--app-border, #e5e7eb);
+      border-radius:12px;
+      background: var(--app-surface, #fff);
+      color: var(--app-text, #111827);
+    }
+    button {
+      padding:8px 12px; border-radius:999px;
+      border:1px solid var(--app-border, #e5e7eb);
+      background: transparent; color: var(--brand-accent, #0ea5e9);
+      cursor:pointer;
+    }
+    .row { display:flex; gap:8px; margin-top:10px; align-items:center; }
+    .stat { color: #6b7280; font-size:12px; margin-top:8px; }
 
-  /* Graph area */
-  #graph.vis3d {
-    grid-area: graph;
-    position:relative;
-    background: var(--graph-background, #0e2e37);
-    border:1px solid var(--app-border, #e5e7eb);
-    border-radius: 14px;
-    box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
-    min-height: 560px;
-  }
-  #graph > div { position:absolute; inset:0; }
+    /* Graph area */
+    #graph.vis3d {
+      grid-area: graph;
+      position:relative;
+      background: var(--graph-background, #0e2e37);
+      border:1px solid var(--app-border, #e5e7eb);
+      border-radius: 14px;
+      box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
+      min-height: 560px;
+    }
+    #graph > div { position:absolute; inset:0; }
 
-  /* Details block */
-  .details {
-    font-size:13px;
-    border:1px solid var(--app-border, #e5e7eb);
-    border-radius:12px;
-    padding:10px;
-    margin-top:10px;
-    background: var(--app-surface, #fff);
-  }
-  .muted { color: #6b7280; font-size:12px; }
+    /* Details block */
+    .details {
+      font-size:13px;
+      border:1px solid var(--app-border, #e5e7eb);
+      border-radius:12px;
+      padding:10px;
+      margin-top:10px;
+      background: var(--app-surface, #fff);
+    }
+    .muted { color: #6b7280; font-size:12px; }
 
-  /* Bottom frame for the table */
-  #bottom {
-    grid-area: bottom;
-    border:1px solid var(--app-border, #e5e7eb);
-    border-radius: 14px;
-    background: var(--app-surface, #fff);
-    box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
-    padding: 12px;
-    max-height: 40vh;            /* adjust if you want more/less height */
-    overflow: auto;              /* scrolls the table if it grows */
-  }
-  #bottom .frame-title {
-    margin: 0 0 6px;
-    font-size: 14px;
-    font-weight: 600;
-  }
+    /* Person cards (selected list) */
+    .cards { display: grid; gap:10px; margin-top:8px; }
+    .person-card {
+      border:1px solid var(--app-border, #e5e7eb);
+      border-radius:12px;
+      padding:10px;
+      background: var(--app-surface, #fff);
+      box-shadow: 0 1px 6px rgba(0,0,0,.05);
+      cursor: pointer;
+    }
+    .person-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    .pc-name { font-weight:600; margin:0 0 4px; }
+    .pc-email { color:#2563eb; text-decoration:none; word-break: break-all; }
+    .pc-row { font-size:12px; color:#374151; margin-top:2px; }
+    .pc-tags { font-size:12px; color:#6b7280; margin-top:6px; }
 
-  /* Table */
-  table.table {
-    width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;
-    background: var(--app-surface, #fff); border:1px solid var(--app-border, #e5e7eb);
-    border-radius: 12px; overflow: hidden;
-  }
-  table.table th, table.table td { border-top:1px solid var(--app-border, #e5e7eb); padding:6px 8px; text-align:left; }
-  table.table thead th { background: rgba(0,0,0,.04); position:sticky; top:0; cursor:pointer; }
-  tr.selected { background: rgba(14,165,233,.12); }
-</style>
+    /* Bottom frame for the table */
+    #bottom {
+      grid-area: bottom;
+      border:1px solid var(--app-border, #e5e7eb);
+      border-radius: 14px;
+      background: var(--app-surface, #fff);
+      box-shadow: var(--shadow, 0 2px 12px rgba(0,0,0,.06));
+      padding: 12px;
+      max-height: 40vh;            /* adjust if you want more/less height */
+      overflow: auto;              /* scrolls the table if it grows */
+    }
+    #bottom .frame-title {
+      margin: 0 0 6px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Table */
+    table.table {
+      width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;
+      background: var(--app-surface, #fff); border:1px solid var(--app-border, #e5e7eb);
+      border-radius: 12px; overflow: hidden;
+    }
+    table.table th, table.table td { border-top:1px solid var(--app-border, #e5e7eb); padding:6px 8px; text-align:left; }
+    table.table thead th { background: rgba(0,0,0,.04); position:sticky; top:0; cursor:pointer; user-select:none; }
+    tr.selected { background: rgba(14,165,233,.12); }
+  </style>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Georama:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="brand.css">
 
-<!-- CSV Loader utilities -->
-<script>
-const CSV_DEFAULT_PATH = 'database_Sep10.csv';
-const HEADER_MAP = {
-  "Event/ Connection": "event",
-  "Last Name": "last",
-  "First Name": "first",
-  "Email": "email",
-  "Edgelands Project": "project",
-  "Idioma": "idioma",
-  "Edgelands Experience": "experience",
-  "Expertise": "expertise",
-  "City": "city"
-};
+  <!-- CSV Loader utilities (unchanged) -->
+  <script>
+  const CSV_DEFAULT_PATH = 'database_Sep10.csv';
+  const HEADER_MAP = {
+    "Event/ Connection": "event",
+    "Last Name": "last",
+    "First Name": "first",
+    "Email": "email",
+    "Edgelands Project": "project",
+    "Idioma": "idioma",
+    "Edgelands Experience": "experience",
+    "Expertise": "expertise",
+    "City": "city"
+  };
 
-function parseCSVLine(line) {
-  const out = []; let cur = ""; let inQ = false;
-  for (let i=0; i<line.length; i++) {
-    const ch = line[i];
-    if (inQ) {
-      if (ch === '"') { if (line[i+1] === '"') { cur += '"'; i++; } else inQ = false; }
-      else cur += ch;
-    } else {
-      if (ch === ',') { out.push(cur); cur=""; }
-      else if (ch === '"') inQ = true;
-      else cur += ch;
+  function parseCSVLine(line) {
+    const out = []; let cur = ""; let inQ = false;
+    for (let i=0; i<line.length; i++) {
+      const ch = line[i];
+      if (inQ) {
+        if (ch === '"') { if (line[i+1] === '"') { cur += '"'; i++; } else inQ = false; }
+        else cur += ch;
+      } else {
+        if (ch === ',') { out.push(cur); cur=""; }
+        else if (ch === '"') inQ = true;
+        else cur += ch;
+      }
     }
+    out.push(cur);
+    return out;
   }
-  out.push(cur);
-  return out;
-}
-function parseCSV(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim().length);
-  if (!lines.length) return [];
-  const headers = parseCSVLine(lines[0]).map(h => h.trim());
-  const rows = [];
-  for (let i=1; i<lines.length; i++) {
-    const cols = parseCSVLine(lines[i]);
-    const obj = {};
-    for (let c=0; c<headers.length; c++) {
-      const raw = headers[c] || "";
-      const key = HEADER_MAP[raw] || raw.toLowerCase().replace(/\s+/g,'_');
-      obj[key] = cols[c] ?? "";
+  function parseCSV(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+    if (!lines.length) return [];
+    const headers = parseCSVLine(lines[0]).map(h => h.trim());
+    const rows = [];
+    for (let i=1; i<lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      const obj = {};
+      for (let c=0; c<headers.length; c++) {
+        const raw = headers[c] || "";
+        theKey = HEADER_MAP[raw] || raw.toLowerCase().replace(/\s+/g,'_');
+        obj[theKey] = cols[c] ?? "";
+      }
+      obj.label = [obj.first, obj.last].filter(Boolean).join(" ").trim();
+      obj.org = obj.project || obj.org || "";
+      rows.push(obj);
     }
-    obj.label = [obj.first, obj.last].filter(Boolean).join(" ").trim();
-    obj.org = obj.project || obj.org || "";
-    rows.push(obj);
-  }
-  return rows;
-}
-
-async function tryFetchCSV(path) {
-  try {
-    const res = await fetch(path, {cache:'no-cache'});
-    if (!res.ok) throw new Error('not ok');
-    const txt = await res.text();
-    const rows = parseCSV(txt);
-    if (!rows.length) throw new Error('empty csv');
-    console.log('Loaded CSV via fetch:', path, rows.length, 'rows');
     return rows;
-  } catch (e) {
-    console.warn('Fetch CSV failed:', e);
-    return null;
   }
-}
 
-function askUserForCSV() {
-  return new Promise(resolve => {
-    const banner = document.createElement('div');
-    banner.style.cssText = 'padding:10px; border:1px dashed #999; border-radius:10px; margin:8px 0;';
-    banner.innerHTML = '<b>Load CSV</b> — Could not auto-load <code>database_Sep10.csv</code>. Choose a file:';
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = '.csv';
-    input.style.marginLeft = '10px';
-    input.onchange = (ev) => {
-      const file = ev.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const txt = reader.result;
-        const rows = parseCSV(txt);
-        console.log('Loaded CSV via file picker:', rows.length, 'rows');
-        banner.remove();
-        resolve(rows);
+  async function tryFetchCSV(path) {
+    try {
+      const res = await fetch(path, {cache:'no-cache'});
+      if (!res.ok) throw new Error('not ok');
+      const txt = await res.text();
+      const rows = parseCSV(txt);
+      if (!rows.length) throw new Error('empty csv');
+      console.log('Loaded CSV via fetch:', path, rows.length, 'rows');
+      return rows;
+    } catch (e) {
+      console.warn('Fetch CSV failed:', e);
+      return null;
+    }
+  }
+
+  function askUserForCSV() {
+    return new Promise(resolve => {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'padding:10px; border:1px dashed #999; border-radius:10px; margin:8px 0;';
+      banner.innerHTML = '<b>Load CSV</b> — Could not auto-load <code>database_Sep10.csv</code>. Choose a file:';
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.csv';
+      input.style.marginLeft = '10px';
+      input.onchange = (ev) => {
+        const file = ev.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const txt = reader.result;
+          const rows = parseCSV(txt);
+          console.log('Loaded CSV via file picker:', rows.length, 'rows');
+          banner.remove();
+          resolve(rows);
+        };
+        reader.readAsText(file);
       };
-      reader.readAsText(file);
-    };
-    banner.appendChild(input);
-    (document.getElementById('left') || document.body).insertBefore(banner, (document.getElementById('left') || document.body).firstChild);
-  });
-}
+      banner.appendChild(input);
+      (document.getElementById('left') || document.body).insertBefore(banner, (document.getElementById('left') || document.body).firstChild);
+    });
+  }
 
-async function loadRows() {
-  const viaFetch = await tryFetchCSV(CSV_DEFAULT_PATH);
-  if (viaFetch && viaFetch.length) return viaFetch;
-  return await askUserForCSV();
-}
-</script>
+  async function loadRows() {
+    const viaFetch = await tryFetchCSV(CSV_DEFAULT_PATH);
+    if (viaFetch && viaFetch.length) return viaFetch;
+    return await askUserForCSV();
+  }
+  </script>
 </head>
 <body class="theme--casual">
 <div id="layout">
@@ -235,6 +251,11 @@ async function loadRows() {
       <button id="clearSel">Clear selection</button>
     </div>
 
+    <label class="row" style="margin-top:6px; align-items:center">
+      <input type="checkbox" id="useSelFilter" />
+      <span style="margin-left:8px">Filter by selection</span>
+    </label>
+
     <div class="details" id="details">
       <div class="muted">Click a node or table row to see details here.</div>
     </div>
@@ -242,9 +263,10 @@ async function loadRows() {
 
   <div id="graph" class="vis3d"><div id="3d"></div></div>
 
-  <!-- NEW: bottom frame with the table -->
+  <!-- Bottom: table frame -->
   <div id="bottom">
     <div class="frame-title">Table</div>
+    <div class="muted" style="margin:-2px 0 6px 0;">Tip: Cmd/Ctrl-click to multi-select, Shift-click for ranges</div>
     <table id="tbl" class="table">
       <thead>
         <tr>
@@ -267,6 +289,7 @@ async function loadRows() {
 <!-- 3D Force Graph (includes three.js) -->
 <script src="https://unpkg.com/3d-force-graph"></script>
 
+<!-- Single boot script with multi-select, selection->filter toggle, and selected cards -->
 <script>
 async function boot(){
   const rows = await loadRows();
@@ -281,7 +304,8 @@ async function boot(){
   }));
 
   let links = [];
-  let selectedId = null;
+  const selectedIds = new Set();   // multi-select store
+  let lastClickedIndex = null;     // for Shift-click ranges
   const visible = new Set(nodes.map(n => n.id));
 
   // HTML refs
@@ -291,6 +315,7 @@ async function boot(){
   const $counts = document.getElementById('counts');
   const $reset = document.getElementById('reset');
   const $clearSel = document.getElementById('clearSel');
+  const $useSelFilter = document.getElementById('useSelFilter');
   const $tbody = document.querySelector('#tbl tbody');
   const $details = document.getElementById('details');
 
@@ -335,8 +360,8 @@ async function boot(){
       const m = Math.min(ids.length*2, 600);
       const used = new Set();
       while (used.size < m) {
-        const s = ids[Math.floor(Math.random()*ids.length)];
-        const t = ids[Math.floor(Math.random()*ids.length)];
+        const s = ids[Math.floor(Math.random()*(ids.length))];
+        const t = ids[Math.floor(Math.random()*(ids.length))];
         const key = s < t ? (s + '|' + t) : (t + '|' + s);
         if (s!==t && !used.has(key)){ used.add(key); links.push({source:s, target:t, kind}); }
       }
@@ -358,23 +383,76 @@ async function boot(){
     .linkOpacity(0.6)
     .linkWidth(1)
     .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim() || '#0e2e37')
-    .nodeColor(n => (n.id === selectedId) ? COL_SEL : colorForCity(n.city))
-    .linkColor(l => (l.source.id === selectedId || l.target.id === selectedId) ? COL_SEL : COL_LINK)
-    .onNodeClick(n => focusNode(n.id));
+    .nodeColor(n => selectedIds.has(n.id) ? COL_SEL : colorForCity(n.city))
+    .linkColor(l => (selectedIds.has(l.source.id||l.source) || selectedIds.has(l.target.id||l.target)) ? COL_SEL : COL_LINK)
+    .onNodeClick(n => toggleSelectById(n.id, { meta: true }));
 
-  function refit() { world.graphData({ nodes: nodes, links: links }); updateCounts(); }
-  function focusNode(id) {
-    selectedId = id;
-    const n = nodes.find(x => x.id===id);
-    if (!n) return;
-    $details.innerHTML = `
-      <div><strong>${n.first||''} ${n.last||''}</strong></div>
-      <div class="muted">${n.email||''}</div>
-      <div>${n.city||''} · ${n.event||''}</div>
-      <div>${n.org||''}</div>`;
-    world.nodeColor(world.nodeColor());
-    world.linkColor(world.linkColor());
+  function sync3DColors(){ world.nodeColor(world.nodeColor()); world.linkColor(world.linkColor()); }
+
+  // Camera fly-to a node when clicking a card
+  function flyToNode(id){
+    const data = world.graphData();
+    const n = data.nodes.find(x => x.id === id);
+    if (!n || typeof n.x !== 'number') return;
+    const dist = 120; // adjust camera distance
+    world.cameraPosition(
+      { x: n.x + dist, y: n.y + dist, z: n.z + dist },
+      { x: n.x, y: n.y, z: n.z },
+      800
+    );
   }
+
+  function renderSelectedCards(){
+    if (selectedIds.size === 0) return false;
+
+    // build cards HTML
+    const selected = [...selectedIds]
+      .map(id => nodes.find(n => n.id === id))
+      .filter(Boolean)
+      .sort((a,b)=> (a.last || '').localeCompare(b.last || '') );
+
+    const cardsHTML = [
+      `<div class="muted" style="margin-bottom:6px">${selected.length} selected</div>`,
+      `<div class="cards">`,
+      ...selected.map(n => `
+        <div class="person-card" data-id="${n.id}">
+          <div class="pc-name">${n.first||''} ${n.last||''}</div>
+          ${n.email ? `<div class="pc-row"><a class="pc-email" href="mailto:${n.email}">${n.email}</a></div>` : ''}
+          <div class="pc-row">${n.city||''}${n.city && n.event ? ' · ' : ''}${n.event||''}</div>
+          ${n.org ? `<div class="pc-row">${n.org}</div>` : ''}
+          <div class="pc-tags">
+            ${n.idioma ? `Idioma: ${n.idioma}` : ''}${n.idioma && (n.experience||n.expertise) ? ' · ' : ''}
+            ${n.experience ? `Exp: ${n.experience}` : ''}${n.experience && n.expertise ? ' · ' : ''}
+            ${n.expertise ? `Expertise: ${n.expertise}` : ''}
+          </div>
+        </div>
+      `),
+      `</div>`
+    ].join('');
+
+    $details.innerHTML = cardsHTML;
+
+    // wire up card clicks: fly to node & keep selection
+    $details.querySelectorAll('.person-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.getAttribute('data-id');
+        flyToNode(id);
+      });
+    });
+
+    return true;
+  }
+
+  function updateDetails(){
+    // If there are selected items, show the selected list as cards
+    if (selectedIds.size > 0) {
+      renderSelectedCards();
+      return;
+    }
+    // Otherwise default message
+    $details.innerHTML = '<div class="muted">Click a node or table row to see details here.</div>';
+  }
+
   function updateCounts(){
     const visN = nodes.filter(n => visible.has(n.id)).length;
     const visE = links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target)).length;
@@ -386,54 +464,112 @@ async function boot(){
     visible.clear();
     const city = $city.value;
     const q = $orgQ.value.trim().toLowerCase();
+
+    // base visibility from form filters
     nodes.forEach(n => {
       const okCity = !city || n.city===city;
       const okOrg = !q || (n.org||'').toLowerCase().includes(q);
       if (okCity && okOrg) visible.add(n.id);
     });
+
+    // only narrow by selection when the toggle is ON
+    if ($useSelFilter.checked && selectedIds.size > 0) {
+      for (const id of [...visible]) if (!selectedIds.has(id)) visible.delete(id);
+    }
+
     const filtered = {
       nodes: nodes.filter(n => visible.has(n.id)),
       links: links.filter(l => visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target))
     };
     world.graphData(filtered);
-    renderTable(); updateCounts();
+    renderTable(); updateCounts(); sync3DColors();
   }
 
-  // Table
+  // Table (with multi-select)
+  let currentTableOrder = []; // node IDs in current render order
+
   function renderTable(){
-    const q = $orgQ.value.trim().toLowerCase();
     const city = $city.value;
+    const q = $orgQ.value.trim().toLowerCase();
+
     const arr = nodes
       .filter(n => (!city || n.city===city) && (!q || (n.org||'').toLowerCase().includes(q)) && visible.has(n.id))
       .sort((a,b)=> (a[sortCol] > b[sortCol] ? (sortAsc?1:-1) : (sortAsc?-1:1)));
+
+    currentTableOrder = arr.map(n => n.id);
+
     $tbody.innerHTML = '';
-    arr.forEach(n => {
+    arr.forEach((n, idx) => {
       const tr = document.createElement('tr');
       tr.dataset.id = n.id;
       tr.innerHTML = `<td>${n.last||""}</td><td>${n.first||""}</td><td>${n.email||""}</td><td>${n.city||""}</td><td>${n.event||""}</td><td>${n.org||""}</td><td>${n.idioma||""}</td><td>${n.experience||""}</td><td>${n.expertise||""}</td>`;
-      tr.onclick = () => focusNode(n.id);
-      if (n.id===selectedId) tr.classList.add('selected');
+      if (selectedIds.has(n.id)) tr.classList.add('selected');
+      tr.addEventListener('click', (ev) => onRowClick(ev, n, idx));
       $tbody.appendChild(tr);
     });
+  }
+
+  function onRowClick(ev, node, idx){
+    // Shift = range select
+    if (ev.shiftKey && lastClickedIndex != null && currentTableOrder.length) {
+      const a = Math.min(lastClickedIndex, idx);
+      const b = Math.max(lastClickedIndex, idx);
+      for (let i=a; i<=b; i++) selectedIds.add(currentTableOrder[i]);
+    } else if (ev.metaKey || ev.ctrlKey) {
+      // Cmd/Ctrl = toggle
+      if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
+      lastClickedIndex = idx;
+    } else {
+      // Plain click = toggle
+      if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
+      lastClickedIndex = idx;
+    }
+    updateDetails();
+    applyFilters();
+  }
+
+  function toggleSelectById(id, opts={}) {
+    // From 3D node clicks
+    if (opts.meta || selectedIds.size===0) {
+      if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    } else {
+      if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    }
+    const tr = $tbody.querySelector(`tr[data-id="${id}"]`);
+    if (tr) tr.scrollIntoView({ block: 'nearest' });
+    updateDetails();
+    applyFilters();
   }
 
   // UI
   document.querySelectorAll('#tbl thead th').forEach(th=>{
     th.onclick = ()=>{ const c=th.dataset.col; sortAsc = (sortCol===c)? !sortAsc : true; sortCol=c; renderTable(); };
   });
-  const $edgeHeaders = document.querySelectorAll('th[data-col]');
-  $edgeHeaders.forEach(th => { th.style.userSelect = 'none'; });
 
   $edgeRule.onchange = ()=>{ rebuildLinks($edgeRule.value); applyFilters(); };
   $city.onchange     = applyFilters;
   $orgQ.oninput      = applyFilters;
-  $reset.onclick     = ()=>{ world.zoomToFit(400); $city.value=""; $orgQ.value=""; applyFilters(); };
-  $clearSel.onclick  = ()=>{ selectedId=null; $details.innerHTML='<div class="muted">Click a node or table row to see details here.</div>'; world.nodeColor(world.nodeColor()); world.linkColor(world.linkColor()); renderTable(); };
+
+  // Toggle selection filtering
+  $useSelFilter.onchange = applyFilters;
+
+  // Optional: Cmd/Ctrl + F toggles the selection filter
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+      e.preventDefault();
+      $useSelFilter.checked = !$useSelFilter.checked;
+      applyFilters();
+    }
+  });
+
+  $reset.onclick     = ()=>{ world.zoomToFit(400); $city.value=""; $orgQ.value=""; selectedIds.clear(); lastClickedIndex=null; updateDetails(); applyFilters(); };
+  $clearSel.onclick  = ()=>{ selectedIds.clear(); lastClickedIndex=null; updateDetails(); applyFilters(); };
 
   // Init
   rebuildLinks($edgeRule.value);
   applyFilters();
   renderTable();
+  updateDetails();
   updateCounts();
 }
 boot();
