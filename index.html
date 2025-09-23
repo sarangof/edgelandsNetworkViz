@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>3D People Network — View/Customize groups + no auto re-zoom</title>
+  <title>3D People Network — Similarity edges</title>
 
   <!-- Brand + fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Georama:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
     #layout{
       display:grid;
       grid-template-columns:380px 1fr 340px;
-      grid-template-rows:1fr auto;
+      grid-template-rows: 60% 40%;
       grid-template-areas:
         "left graph right"
         "bottom bottom bottom";
@@ -24,44 +24,30 @@
     .panel{ border:1px solid var(--app-border, rgba(255,255,255,.08)); border-radius:14px; background: var(--app-surface,#111); box-shadow:0 2px 12px rgba(0,0,0,.3); color: var(--app-text,#e5e5e5) }
     #left{ grid-area:left; padding:12px; overflow:auto }
     #right{ grid-area:right; padding:12px; overflow:auto }
-    #graph.vis3d{ grid-area:graph; position:relative; background: var(--graph-background,#0b0b0b); border:1px solid var(--app-border); border-radius:14px; min-height:560px; box-shadow:0 2px 12px rgba(0,0,0,.3) }
+    #graph.vis3d{ grid-area:graph; position:relative; background: var(--graph-background,#0b0b0b); border:1px solid var(--app-border); border-radius:14px; height:100%; min-height:0; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.3) }
     #graph>div{ position:absolute; inset:0 }
 
-    #bottom{ grid-area:bottom; padding:12px; overflow:auto; max-height:55vh }
+    #bottom{ grid-area:bottom; padding:12px; overflow:auto; height:40vh; max-height:100vh; position:relative; z-index:2 }
     #counts{ font-size:13px; color: var(--col-muted,#9aa0a6); margin:0 0 6px 0 }
 
     h2{margin:0 0 10px; font-size:16px; font-weight:700; font-family: var(--font-display,var(--font-sans)) }
     label{display:block; margin-top:10px; font-weight:600}
-    select{ width:100%; padding:8px 10px; border-radius:10px; border:1px solid var(--app-border); background:#121212; color: var(--app-text,#e5e5e5) }
+    select, input[type="range"]{ width:100% }
+    select{ padding:8px 10px; border-radius:10px; border:1px solid var(--app-border); background:#121212; color: var(--app-text,#e5e5e5) }
     button{ padding:8px 12px; border-radius:999px; border:1px solid var(--brand-accent,#DAF300); background:transparent; color: var(--brand-accent,#DAF300); cursor:pointer }
     .row{display:flex; gap:8px; margin-top:10px; align-items:center}
     .muted{color: var(--col-muted,#9aa0a6); font-size:12px}
 
     /* Group frames */
-    .group{
-      border:1px solid var(--app-border);
-      border-radius:14px;
-      background:#121212;
-      margin-bottom:14px;
-      overflow:hidden;
-    }
-    .group-title{
-      padding:10px 12px;
-      font-weight:900; font-size:12px; letter-spacing:.12em; text-transform:uppercase;
-      color: var(--col-muted,#9aa0a6);
-      border-bottom:1px solid var(--app-border);
-      background:rgba(255,255,255,.03)
-    }
+    .group{ border:1px solid var(--app-border); border-radius:14px; background:#121212; margin-bottom:14px; overflow:hidden }
+    .group-title{ padding:10px 12px; font-weight:900; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color: var(--col-muted,#9aa0a6); border-bottom:1px solid var(--app-border); background:rgba(255,255,255,.03) }
     .group-body{ padding:8px 10px }
 
     /* Inner boxed sections (collapsible) */
     .box{ border:1px solid var(--app-border); border-radius:12px; background:#101010; margin:10px 0 }
     .box-head{ padding:10px }
     .box-body{ padding:10px; border-top:1px solid var(--app-border) }
-    .box-toggle{
-      all:unset; display:flex; align-items:center; justify-content:space-between;
-      width:100%; cursor:pointer; font-weight:800; font-size:13px; letter-spacing:.02em
-    }
+    .box-toggle{ all:unset; display:flex; align-items:center; justify-content:space-between; width:100%; cursor:pointer; font-weight:800; font-size:13px; letter-spacing:.02em }
     .box-toggle::after{ content:"▾"; opacity:.85; transition:transform .18s ease }
     .box.is-closed .box-toggle::after{ transform:rotate(-90deg) }
     .box.is-closed .box-body{ display:none }
@@ -229,18 +215,32 @@
           </div>
         </div>
 
-        <!-- Edge rule -->
+        <!-- Edge rule: SIMILARITY -->
         <div class="box collapsible" id="box-edge">
           <div class="box-head">
             <button class="box-toggle" id="toggle-edge" aria-expanded="true" aria-controls="edge-body">Edge rule</button>
           </div>
           <div class="box-body" id="edge-body">
-            <select id="edgeRule">
+            <label>Mode</label>
+            <select id="edgeMode">
+              <option value="similarity" selected>Similarity (custom)</option>
               <option value="random">Random (demo)</option>
-              <option value="city">Same City</option>
-              <option value="org">Same Organization/Project</option>
-              <option value="event">Same Event/Connection</option>
             </select>
+
+            <div id="simOptions" style="margin-top:10px">
+              <div class="muted" style="margin-bottom:6px">Similarity fields (check to include)</div>
+              <label class="row"><input type="checkbox" id="simChk-language" checked><span>Language</span></label>
+              <label class="row"><input type="checkbox" id="simChk-project"  checked><span>Edgelands Project</span></label>
+              <label class="row"><input type="checkbox" id="simChk-city"      checked><span>City</span></label>
+              <label class="row"><input type="checkbox" id="simChk-expertise"><span>Expertise</span></label>
+              <label class="row"><input type="checkbox" id="simChk-experience"><span>Edgelands Experience</span></label>
+
+              <div class="row" style="align-items:center; gap:12px; margin-top:12px">
+                <label style="margin:0; min-width:110px">Threshold</label>
+                <input type="range" id="simThreshold" min="0" max="100" step="5" value="70">
+                <div id="simThresholdLabel" style="width:40px; text-align:right">70%</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -301,9 +301,10 @@
   const visible=new Set(nodes.map(n=>n.id));
 
   // DOM refs
-  const $edgeRule=document.getElementById('edgeRule');
-  const $nodeColorBy=document.getElementById('nodeColorBy');
-  const $edgeColorBy=document.getElementById('edgeColorBy');
+  const $edgeMode=document.getElementById('edgeMode');
+  const $simOptions=document.getElementById('simOptions');
+  const $th=document.getElementById('simThreshold');
+  const $thLbl=document.getElementById('simThresholdLabel');
   const $counts=document.getElementById('counts');
   const $reset=document.getElementById('reset');
   const $clearSel=document.getElementById('clearSel');
@@ -312,6 +313,8 @@
   const $tbody=document.querySelector('#tbl tbody');
   const $details=document.getElementById('details');
   const $filters=document.getElementById('filters');
+  const $nodeColorBy=document.getElementById('nodeColorBy');
+  const $edgeColorBy=document.getElementById('edgeColorBy');
 
   // Collapsibles with persistence
   function initCollapsible(boxId, storageKey, defaultOpen=true){
@@ -334,37 +337,14 @@
   // Sorting
   let sortCol='last', sortAsc=true;
 
-  // Edges
-  function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-  function addGroupLinks(ids,kind){
-    if(ids.length<=20){
-      for(let i=0;i<ids.length;i++) for(let j=i+1;j<ids.length;j++) links.push({source:ids[i],target:ids[j],kind})
-    } else {
-      const arr=shuffle(ids.slice());
-      for(let i=0;i<arr.length;i++) links.push({source:arr[i],target:arr[(i+1)%arr.length],kind});
-      const extra=Math.min(arr.length*2,1000);
-      for(let k=0;k<extra;k++){const s=arr[Math.floor(Math.random()*arr.length)], t=arr[Math.floor(Math.random()*arr.length)]; if(s!==t) links.push({source:s,target:t,kind})}
-    }
-  }
-  function rebuildLinks(kind){
-    links=[]; const ids=nodes.map(n=>n.id);
-    if(kind==='random'){
-      const m=Math.min(ids.length*2,600), used=new Set();
-      while(used.size<m){
-        const s=ids[Math.floor(Math.random()*ids.length)], t=ids[Math.floor(Math.random()*ids.length)];
-        if(s===t) continue; const key=s<t?`${s}|${t}`:`${t}|${s}`;
-        if(!used.has(key)){used.add(key); links.push({source:s,target:t,kind})}
-      }
-    } else {
-      const keyAttr=kind==='city'?'city':(kind==='org'?'org':'event');
-      const groups={}; nodes.forEach(n=>(groups[n[keyAttr]||'']??=[]).push(n.id));
-      Object.values(groups).forEach(list=>addGroupLinks(list,kind));
-    }
-  }
-
-  // Token sets for OR facets
+  // Token sets for OR facets and similarity
   const tokenFacetKeys=new Set(['language','experience','expertise','project']);
-  const nodeTokens={}; nodes.forEach(n=>{nodeTokens[n.id]={}; for(const k of tokenFacetKeys){nodeTokens[n.id][k]=new Set((n[k]||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean))}});
+  const nodeTokens={}; nodes.forEach(n=>{
+    nodeTokens[n.id]={};
+    for(const k of tokenFacetKeys){
+      nodeTokens[n.id][k]=new Set((n[k]||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean));
+    }
+  });
 
   // 3D graph
   const world=ForceGraph3D()(document.getElementById('3d'))
@@ -372,11 +352,16 @@
     .nodeId('id')
     .nodeLabel(n=>[n.label,[n.project,n.city].filter(Boolean).join(' — ')].filter(Boolean).join('\n'))
     .nodeRelSize(4).nodeOpacity(0.9)
-    .linkOpacity(0.6).linkWidth(1)
+    .linkOpacity(0.6)
     .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim()||'#0b0b0b')
     .onNodeClick(n=>toggleSelectById(n.id));
 
-  // One-time frame-to-bounds (no periodic re-centering)
+  // One-time frame after layout starts (no periodic re-center)
+  setTimeout(()=>frameToBounds(4.2), 900);
+  const graphWrap=document.getElementById('graph');
+  new ResizeObserver(()=>{ world.width(graphWrap.clientWidth).height(graphWrap.clientHeight); }).observe(graphWrap);
+  world.width(graphWrap.clientWidth).height(graphWrap.clientHeight);
+
   function frameToBounds(mult=3.8){
     const arr=world.graphData().nodes; if(!arr.length) return;
     let minX=+Infinity,minY=+Infinity,minZ=+Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
@@ -388,29 +373,19 @@
     const radius=Math.max(rx,ry,rz)/2 || 120;
     world.cameraPosition({x:cx+radius*mult, y:cy+radius*mult, z:cz+radius*mult}, {x:cx,y:cy,z:cz}, 800);
   }
-  // Initial frame only (after forces have kicked in a bit)
-  setTimeout(()=>frameToBounds(4.2), 900);
 
-  // Keep graph sized to container (no re-framing)
-  const graphWrap=document.getElementById('graph');
-  function resize(){ world.width(graphWrap.clientWidth).height(graphWrap.clientHeight); }
-  new ResizeObserver(resize).observe(graphWrap); resize();
-
-  // Colors
+  // ===== Colors
   let nodeColorMode='city';
   let edgeColorMode='by-rule';
-
+  function cityTokenColor(city){ const v=getComputedStyle(document.documentElement).getPropertyValue(`--city-${(city||'').toLowerCase().replace(/\s+/g,'')}`).trim(); return v || null }
   function nodeColor(n){
-    if (selectedIds.has(n.id)) return COL_SEL;
+    if (selectedIds.has(n.id)) return getComputedStyle(document.documentElement).getPropertyValue('--graph-node-selected').trim()||'#DAF300';
     switch(nodeColorMode){
-      case 'city': {
-        const c = cityTokenColor(n.city);
-        return c || getBrandColor(n.city,'fallback');
-      }
+      case 'city': { const c=cityTokenColor(n.city); return c || getBrandColor(n.city,'fallback'); }
       case 'project': return getBrandColor(firstToken(n.project), 'project');
       case 'language':return getBrandColor(firstToken(n.language), 'language');
       case 'event':   return getBrandColor(n.event, 'event');
-      default:        return COL_NODE_DEFAULT;
+      default:        return getComputedStyle(document.documentElement).getPropertyValue('--graph-node').trim()||'#00B08B';
     }
   }
   function edgeColor(l){
@@ -418,16 +393,92 @@
     switch(edgeColorMode){
       case 'same-nodes': return nodeColor(s);
       case 'by-rule':
-        if (l.kind==='city')  return cityTokenColor(s.city) || getBrandColor(s.city,'fallback');
-        if (l.kind==='org')   return getBrandColor(firstToken(s.project),'project');
-        if (l.kind==='event') return getBrandColor(s.event,'event');
+        if (l.kind==='sim')  return 'rgba(200,200,200,0.65)';
+        if (l.kind==='random') return 'rgba(150,150,150,0.45)';
         return COL_LINK_DEFAULT;
       default: return COL_LINK_DEFAULT;
     }
   }
-  function applyColors(){ world.nodeColor(nodeColor); world.linkColor(edgeColor); }
+  function applyColors(){
+    world.nodeColor(nodeColor);
+    world.linkColor(edgeColor);
+    world.linkWidth(l => l.kind==='sim' ? (0.3 + 1.2*(l.score||0)) : 0.6);
+  }
 
-  // Right cards
+  // ===== Edge building
+  function getSimilaritySettings(){
+    const fields=[];
+    if (document.getElementById('simChk-language').checked)  fields.push('language');
+    if (document.getElementById('simChk-project').checked)   fields.push('project');
+    if (document.getElementById('simChk-city').checked)      fields.push('city');
+    if (document.getElementById('simChk-expertise').checked) fields.push('expertise');
+    if (document.getElementById('simChk-experience').checked)fields.push('experience');
+    const threshold = (+$th.value)/100;
+    return { fields, threshold };
+  }
+
+  function jaccard(aSet,bSet){
+    if (!aSet.size && !bSet.size) return NaN; // no info
+    let inter=0;
+    if (aSet.size < bSet.size) { aSet.forEach(v=>{ if(bSet.has(v)) inter++; }); }
+    else { bSet.forEach(v=>{ if(aSet.has(v)) inter++; }); }
+    const union = new Set([...aSet, ...bSet]).size;
+    return union ? inter/union : NaN;
+  }
+
+  function pairSimilarity(a,b,fields){
+    const scores=[];
+    for(const f of fields){
+      if (f==='city'){
+        const va=(a.city||'').trim(), vb=(b.city||'').trim();
+        if (va==='' && vb==='') continue;
+        scores.push(va && vb ? (va===vb?1:0) : 0);
+      } else {
+        const A=nodeTokens[a.id][f]||new Set(), B=nodeTokens[b.id][f]||new Set();
+        const s=jaccard(A,B); if (!Number.isNaN(s)) scores.push(s);
+      }
+    }
+    if (!scores.length) return 0;
+    return scores.reduce((x,y)=>x+y,0)/scores.length; // simple mean
+  }
+
+  function rebuildLinks(mode){
+    links=[];
+    if (mode==='random'){
+      const ids=nodes.map(n=>n.id);
+      const m=Math.min(ids.length*2,600), used=new Set();
+      while(used.size<m){
+        const s=ids[Math.floor(Math.random()*ids.length)], t=ids[Math.floor(Math.random()*ids.length)];
+        if(s===t) continue; const key=s<t?`${s}|${t}`:`${t}|${s}`;
+        if(!used.has(key)){used.add(key); links.push({source:s,target:t,kind:'random'})}
+      }
+      world.graphData({nodes,links});
+      applyFilters(); // will re-color and count
+      return;
+    }
+
+    // Similarity mode
+    const {fields, threshold} = getSimilaritySettings();
+    if (!fields.length){
+      world.graphData({nodes,links}); // empty
+      applyFilters();
+      return;
+    }
+
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i], b=nodes[j];
+        const score = pairSimilarity(a,b,fields);
+        if (score >= threshold){
+          links.push({source:a.id, target:b.id, kind:'sim', score});
+        }
+      }
+    }
+    world.graphData({nodes,links});
+    applyFilters();
+  }
+
+  // ===== Right cards, counts, filters (unchanged)
   function renderSelectedCards(){
     if(selectedIds.size===0){ $details.innerHTML='<div class="muted">Click a node or table row to see details here.</div>'; return; }
     const sel=[...selectedIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean).sort((a,b)=>(a.last||'').localeCompare(b.last||''));
@@ -535,22 +586,34 @@
 
   // UI wiring
   document.querySelectorAll('#tbl thead th').forEach(th=>{ th.onclick=()=>{ const c=th.dataset.col; sortAsc=(sortCol===c)?!sortAsc:true; sortCol=c; renderTable() }});
-  $edgeRule.onchange=()=>{ rebuildLinks($edgeRule.value); applyFilters() };
-  $nodeColorBy.onchange=()=>{ nodeColorMode=$nodeColorBy.value; applyColors(); };
-  $edgeColorBy.onchange=()=>{ edgeColorMode=$edgeColorBy.value; applyColors(); };
+  document.getElementById('nodeColorBy').onchange=()=>{ nodeColorMode=$nodeColorBy.value; applyColors(); };
+  document.getElementById('edgeColorBy').onchange=()=>{ edgeColorMode=$edgeColorBy.value; applyColors(); };
   $useSelFilter.onchange=applyFilters;
 
-  $reset.onclick=()=>{ frameToBounds(4.2); for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) } selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
+  $edgeMode.onchange=()=>{
+    const sim = $edgeMode.value==='similarity';
+    $simOptions.style.display = sim ? 'block' : 'none';
+    rebuildLinks($edgeMode.value);
+  };
+  $th.oninput=()=>{ $thLbl.textContent = $th.value + '%'; rebuildLinks($edgeMode.value); };
+  ['language','project','city','expertise','experience'].forEach(k=>{
+    document.getElementById('simChk-'+k).onchange=()=>rebuildLinks($edgeMode.value);
+  });
+
+  $reset.onclick=()=>{ frameToBounds(4.2); selectedIds.clear(); lastClickedIndex=null;
+    for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) }
+    renderSelectedCards(); rebuildLinks($edgeMode.value);
+  };
   $clearSel.onclick=()=>{ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
   $clearAllFilters.onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) } applyFilters() };
 
   // Init
-  rebuildLinks($edgeRule.value);
   buildFacets();
-  applyFilters();
   renderTable();
   renderSelectedCards();
-  updateCounts();
+
+  // Build edges initially (similarity)
+  rebuildLinks($edgeMode.value);
 })();
 </script>
 </body>
