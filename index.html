@@ -231,7 +231,6 @@
               <label class="row"><input type="checkbox" id="simChk-expertise"><span>Expertise</span></label>
               <label class="row"><input type="checkbox" id="simChk-experience"><span>Edgelands Experience</span></label>
 
-
               <div class="row" style="align-items:center; gap:12px; margin-top:12px">
                 <label style="margin:0; min-width:110px">Threshold</label>
                 <input type="range" id="simThreshold" min="0" max="100" step="5" value="10">
@@ -259,6 +258,15 @@
   <div id="bottom" class="panel">
     <div id="counts">Visible: —</div>
     <div class="frame-title">Table</div>
+
+    <!-- Global search UI -->
+    <div class="row" id="global-search-row" style="gap:8px; align-items:center; margin:8px 0">
+      <input id="globalSearch" type="search" placeholder="Search all columns… e.g., bogotá data"
+             style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:8px; min-width:180px">
+      <button id="clearSearch" type="button" title="Clear"
+              style="padding:6px 10px; border:1px solid #ccc; border-radius:8px; background:#f7f7f7">×</button>
+    </div>
+
     <div class="muted" style="margin:-2px 0 6px 0;">Tip: Cmd/Ctrl-click to multi-select, Shift-click for ranges</div>
     <table id="tbl" class="table">
       <thead>
@@ -312,6 +320,41 @@
   const $filters=document.getElementById('filters');
   const $nodeColorBy=document.getElementById('nodeColorBy');
   const $edgeColorBy=document.getElementById('edgeColorBy');
+
+  // --- Global search refs/state ---
+  const $search = document.getElementById('globalSearch');
+  const $clearSearch = document.getElementById('clearSearch');
+  let searchTerms = [];
+  function setSearchTerms(val) {
+    searchTerms = String(val || '')
+      .toLowerCase()
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+  function debounce(fn, ms=150) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
+  function rowMatchesSearch(node) {
+    if (searchTerms.length === 0) return true;
+    const flatValues = (val) => Array.isArray(val) ? val : [val];
+    const haystack = Object.values(node)
+      .flatMap(flatValues)
+      .filter(v => typeof v === 'string' || typeof v === 'number')
+      .join(' ')
+      .toLowerCase();
+    return searchTerms.every(t => haystack.includes(t));
+  }
+  $search?.addEventListener('input', debounce(e => {
+    setSearchTerms(e.target.value);
+    applyFilters();
+  }, 150));
+  $clearSearch?.addEventListener('click', () => {
+    $search.value = '';
+    setSearchTerms('');
+    applyFilters();
+  });
 
   // Collapsibles with persistence
   function initCollapsible(boxId, storageKey, defaultOpen=true){
@@ -475,7 +518,7 @@
     applyFilters();
   }
 
-  // ===== Right cards, counts, filters (unchanged)
+  // ===== Right cards, counts, filters
   function renderSelectedCards(){
     if(selectedIds.size===0){ $details.innerHTML='<div class="muted">Click a node or table row to see details here.</div>'; return; }
     const sel=[...selectedIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean).sort((a,b)=>(a.last||'').localeCompare(b.last||''));
@@ -551,7 +594,7 @@
 
   function applyFilters(){
     visible.clear();
-    nodes.forEach(n=>{ if(rowPassesFacets(n)) visible.add(n.id) });
+    nodes.forEach(n=>{ if(rowPassesFacets(n) && rowMatchesSearch(n)) visible.add(n.id) });
     const filtered={
       nodes: nodes.filter(n=>visible.has(n.id)),
       links: links.filter(l=>visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target))
@@ -606,7 +649,7 @@
     renderSelectedCards(); rebuildLinks($edgeMode.value);
   };
   $clearSel.onclick=()=>{ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
-  $clearAllFilters.onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) } applyFilters() };
+  $clearAllFilters.onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } applyFilters() };
 
   // Init
   buildFacets();
