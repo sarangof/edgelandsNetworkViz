@@ -127,7 +127,7 @@
   // Selection & muting colors (white reserved for selection)
   const COL_SELECTED = '#FFFFFF';
   const MUTED_NODE   = '#2a2a2a';
-  const MUTED_LINK   = '#202020';
+  const MUTED_LINK   = '#141414'; //'#202020'; 
 
   const BRAND_PALETTE = ['#335852','#70AF94','#D85751','#E2F16C','#473B36','#BCCFC8'];
   const colorMap = { project:new Map(), language:new Map(), event:new Map(), fallback:new Map() };
@@ -466,19 +466,24 @@
     return MUTED_LINK;
   }
 
-  function applyColors(){
-    world.nodeColor(nodeColor);
-    world.linkColor(edgeColor);
-    world.linkWidth(l=>{
-      const sId = typeof l.source==='object' ? l.source.id : l.source;
-      const tId = typeof l.target==='object' ? l.target.id : l.target;
-      if (selectedIds.has(sId) || selectedIds.has(tId)) return 2.4 + (l.score||0)*1.2;        // thicker when touching selection
-      if (activeIds.has(sId) && activeIds.has(tId) && l.kind==='sim') return 0.8 + (l.score||0)*0.8;
-      return 0.25; // muted/others
-    });
-    world.nodeOpacity(0.95);  // keep numeric
-    world.linkOpacity(0.18);  // keep numeric
-  }
+function applyColors(){
+  world.nodeColor(nodeColor);
+  world.linkColor(edgeColor);
+
+  // Widths: selected incident edges thicker; active-by-sim moderate; others thin
+  world.linkWidth(l => {
+    const sId = typeof l.source==='object' ? l.source.id : l.source;
+    const tId = typeof l.target==='object' ? l.target.id : l.target;
+    if (selectedIds.has(sId) || selectedIds.has(tId)) return 3.6 + (l.score||0)*1.6;  
+    if (activeIds.has(sId) && activeIds.has(tId) && l.kind==='sim') return 0.9 + (l.score||0)*0.8;
+    return 0.22; 
+  });
+
+  // Slightly raise opacity ONLY when there is a selection
+  world.linkOpacity(selectedIds.size ? 0.33 : 0.18); 
+  world.nodeOpacity(0.95);
+}
+
 
   // ===== Edge building
   function getSimilaritySettings(){
