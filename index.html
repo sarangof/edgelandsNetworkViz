@@ -163,10 +163,6 @@
               <button id="reset">Reset view</button>
               <button id="clearSel">Clear selection</button>
             </div>
-            <label class="row" style="margin-top:8px; align-items:center">
-              <input type="checkbox" id="useSelFilter" />
-              <span style="margin-left:8px">Filter by selection</span>
-            </label>
           </div>
         </div>
 
@@ -218,7 +214,7 @@
         <!-- Edge rule: SIMILARITY -->
         <div class="box collapsible" id="box-edge">
           <div class="box-head">
-            <button class="box-toggle" id="toggle-edge" aria-expanded="true" aria-controls="edge-body">Edge rule</button>
+            <button class="box-toggle" id="toggle-edge" aria-expanded="true" aria-controls="edge-body">Edge rule (advanced)</button>
           </div>
           <div class="box-body" id="edge-body">
             <label>Mode</label>
@@ -229,16 +225,17 @@
 
             <div id="simOptions" style="margin-top:10px">
               <div class="muted" style="margin-bottom:6px">Similarity fields (check to include)</div>
-              <label class="row"><input type="checkbox" id="simChk-language" checked><span>Language</span></label>
+              <label class="row"><input type="checkbox" id="simChk-language"><span>Language</span></label>
               <label class="row"><input type="checkbox" id="simChk-project"  checked><span>Edgelands Project</span></label>
-              <label class="row"><input type="checkbox" id="simChk-city"      checked><span>City</span></label>
+              <label class="row"><input type="checkbox" id="simChk-city"><span>City</span></label>
               <label class="row"><input type="checkbox" id="simChk-expertise"><span>Expertise</span></label>
               <label class="row"><input type="checkbox" id="simChk-experience"><span>Edgelands Experience</span></label>
 
+
               <div class="row" style="align-items:center; gap:12px; margin-top:12px">
                 <label style="margin:0; min-width:110px">Threshold</label>
-                <input type="range" id="simThreshold" min="0" max="100" step="5" value="70">
-                <div id="simThresholdLabel" style="width:40px; text-align:right">70%</div>
+                <input type="range" id="simThreshold" min="0" max="100" step="5" value="10">
+                <div id="simThresholdLabel" style="width:40px; text-align:right">10%</div>
               </div>
             </div>
           </div>
@@ -305,11 +302,11 @@
   const $simOptions=document.getElementById('simOptions');
   const $th=document.getElementById('simThreshold');
   const $thLbl=document.getElementById('simThresholdLabel');
+  $thLbl.textContent = $th.value + '%';
   const $counts=document.getElementById('counts');
   const $reset=document.getElementById('reset');
   const $clearSel=document.getElementById('clearSel');
   const $clearAllFilters=document.getElementById('clearAllFilters');
-  const $useSelFilter=document.getElementById('useSelFilter');
   const $tbody=document.querySelector('#tbl tbody');
   const $details=document.getElementById('details');
   const $filters=document.getElementById('filters');
@@ -332,7 +329,7 @@
   initCollapsible('box-selection','selection', true);
   initCollapsible('box-filters','filters', true);
   initCollapsible('box-coloring','coloring', true);
-  initCollapsible('box-edge','edge', true);
+  initCollapsible('box-edge','edge-v2', false);
 
   // Sorting
   let sortCol='last', sortAsc=true;
@@ -553,11 +550,16 @@
   }
 
   function applyFilters(){
-    visible.clear(); nodes.forEach(n=>{ if(rowPassesFacets(n)) visible.add(n.id) });
-    if($useSelFilter.checked && selectedIds.size>0){ for(const id of [...visible]) if(!selectedIds.has(id)) visible.delete(id) }
-    const filtered={ nodes:nodes.filter(n=>visible.has(n.id)), links:links.filter(l=>visible.has(l.source.id||l.source)&&visible.has(l.target.id||l.target)) };
+    visible.clear();
+    nodes.forEach(n=>{ if(rowPassesFacets(n)) visible.add(n.id) });
+    const filtered={
+      nodes: nodes.filter(n=>visible.has(n.id)),
+      links: links.filter(l=>visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target))
+    };
     world.graphData(filtered);
-    renderTable(); updateCounts(); applyColors();
+    renderTable();
+    updateCounts();
+    applyColors();
   }
 
   let currentTableOrder=[];
@@ -588,7 +590,6 @@
   document.querySelectorAll('#tbl thead th').forEach(th=>{ th.onclick=()=>{ const c=th.dataset.col; sortAsc=(sortCol===c)?!sortAsc:true; sortCol=c; renderTable() }});
   document.getElementById('nodeColorBy').onchange=()=>{ nodeColorMode=$nodeColorBy.value; applyColors(); };
   document.getElementById('edgeColorBy').onchange=()=>{ edgeColorMode=$edgeColorBy.value; applyColors(); };
-  $useSelFilter.onchange=applyFilters;
 
   $edgeMode.onchange=()=>{
     const sim = $edgeMode.value==='similarity';
