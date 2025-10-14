@@ -121,14 +121,16 @@
 
   // Brand tokens & palette
   const css=getComputedStyle(document.documentElement);
-  const COL_NODE_DEFAULT = css.getPropertyValue('--graph-node').trim()||'#00B08B';
-  const COL_LINK_DEFAULT = css.getPropertyValue('--graph-link').trim()||'rgba(180,180,180,0.6)';
+  const COL_NODE_DEFAULT=css.getPropertyValue('--graph-node').trim()||'#00B08B';
+  const COL_SEL =css.getPropertyValue('--graph-node-selected').trim()||'#DAF300';
+  const COL_LINK_DEFAULT=css.getPropertyValue('--graph-link').trim()||'rgba(180,180,180,0.6)';
+  function cityTokenColor(city){
+    const v=css.getPropertyValue(`--city-${(city||'').toLowerCase().replace(/\s+/g,'')}`).trim();
+    return v || null;
+  }
+  function firstToken(v){ return (v||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)[0] || '' }
 
-  // Selection & muting colors (white reserved for selection)
-  const COL_SELECTED = '#FFFFFF';
-  const MUTED_NODE   = '#2a2a2a';
-  const MUTED_LINK   = '#202020';
-
+  // From brand slides
   const BRAND_PALETTE = ['#335852','#70AF94','#D85751','#E2F16C','#473B36','#BCCFC8'];
   const colorMap = { project:new Map(), language:new Map(), event:new Map(), fallback:new Map() };
   function getBrandColor(value, domain='fallback'){
@@ -137,11 +139,6 @@
     if(cmap.has(key)) return cmap.get(key);
     const col=BRAND_PALETTE[cmap.size % BRAND_PALETTE.length]; cmap.set(key,col); return col;
   }
-  function cityTokenColor(city){
-    const v=css.getPropertyValue(`--city-${(city||'').toLowerCase().replace(/\s+/g,'')}`).trim();
-    return v || null;
-  }
-  function firstToken(v){ return (v||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)[0] || '' }
   </script>
 </head>
 
@@ -264,7 +261,7 @@
 
     <!-- Global search UI -->
     <div class="row" id="global-search-row" style="gap:8px; align-items:center; margin:8px 0">
-      <input id="globalSearch" type="search" placeholder="Search all columns e.g., Nairobi, data..."
+      <input id="globalSearch" type="search" placeholder="Search all columns… e.g., bogotá data"
              style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:8px; min-width:180px">
       <button id="clearSearch" type="button" title="Clear"
               style="padding:6px 10px; border:1px solid #ccc; border-radius:8px; background:#f7f7f7">×</button>
@@ -306,16 +303,14 @@
   let links=[];
   const selectedIds=new Set();
   let lastClickedIndex=null;
-
-  // "Active" (passes filters/search) and "Neighbor" (touches a selection)
-  const activeIds   = new Set();
-  const neighborIds = new Set();
+  const visible=new Set(nodes.map(n=>n.id));
 
   // DOM refs
   const $edgeMode=document.getElementById('edgeMode');
   const $simOptions=document.getElementById('simOptions');
   const $th=document.getElementById('simThreshold');
-  const $thLbl=document.getElementById('simThresholdLabel'); $thLbl.textContent = $th.value + '%';
+  const $thLbl=document.getElementById('simThresholdLabel');
+  $thLbl.textContent = $th.value + '%';
   const $counts=document.getElementById('counts');
   const $reset=document.getElementById('reset');
   const $clearSel=document.getElementById('clearSel');
@@ -337,7 +332,10 @@
       .split(/\s+/)
       .filter(Boolean);
   }
-  function debounce(fn, ms=150) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
+  function debounce(fn, ms=150) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
   function rowMatchesSearch(node) {
     if (searchTerms.length === 0) return true;
     const flatValues = (val) => Array.isArray(val) ? val : [val];
@@ -348,8 +346,15 @@
       .toLowerCase();
     return searchTerms.every(t => haystack.includes(t));
   }
-  $search?.addEventListener('input', debounce(e => { setSearchTerms(e.target.value); applyFilters(); }, 150));
-  $clearSearch?.addEventListener('click', () => { $search.value=''; setSearchTerms(''); applyFilters(); });
+  $search?.addEventListener('input', debounce(e => {
+    setSearchTerms(e.target.value);
+    applyFilters();
+  }, 150));
+  $clearSearch?.addEventListener('click', () => {
+    $search.value = '';
+    setSearchTerms('');
+    applyFilters();
+  });
 
   // Collapsibles with persistence
   function initCollapsible(boxId, storageKey, defaultOpen=true){
@@ -386,13 +391,12 @@
     .graphData({nodes,links})
     .nodeId('id')
     .nodeLabel(n=>[n.label,[n.project,n.city].filter(Boolean).join(' — ')].filter(Boolean).join('\n'))
-    .nodeRelSize(4)
-    .nodeOpacity(0.95)    // numeric constant
-    .linkOpacity(0.18)    // numeric constant
+    .nodeRelSize(4).nodeOpacity(0.9)
+    .linkOpacity(0.6)
     .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim()||'#0b0b0b')
     .onNodeClick(n=>toggleSelectById(n.id));
 
-  // One-time frame after layout starts
+  // One-time frame after layout starts (no periodic re-center)
   setTimeout(()=>frameToBounds(4.2), 900);
   const graphWrap=document.getElementById('graph');
   new ResizeObserver(()=>{ world.width(graphWrap.clientWidth).height(graphWrap.clientHeight); }).observe(graphWrap);
@@ -410,74 +414,35 @@
     world.cameraPosition({x:cx+radius*mult, y:cy+radius*mult, z:cz+radius*mult}, {x:cx,y:cy,z:cz}, 800);
   }
 
-  // ===== State → colors & widths
+  // ===== Colors
   let nodeColorMode='city';
   let edgeColorMode='by-rule';
-
-  function recomputeNeighbors(){
-    neighborIds.clear();
-    if (selectedIds.size===0) return;
-    for (const l of links){
-      const s = typeof l.source==='object' ? l.source.id : l.source;
-      const t = typeof l.target==='object' ? l.target.id : l.target;
-      if (selectedIds.has(s)) neighborIds.add(t);
-      if (selectedIds.has(t)) neighborIds.add(s);
-    }
-  }
-
+  function cityTokenColor(city){ const v=getComputedStyle(document.documentElement).getPropertyValue(`--city-${(city||'').toLowerCase().replace(/\s+/g,'')}`).trim(); return v || null }
   function nodeColor(n){
-    // Selection dominates → white
-    if (selectedIds.has(n.id)) return COL_SELECTED;
-
-    // Active or neighbor → full palette
-    if (activeIds.has(n.id) || neighborIds.has(n.id)){
-      switch(nodeColorMode){
-        case 'city': { const c=cityTokenColor(n.city); return c || getBrandColor(n.city,'fallback'); }
-        case 'project':  return getBrandColor(firstToken(n.project), 'project');
-        case 'language': return getBrandColor(firstToken(n.language), 'language');
-        case 'event':    return getBrandColor(n.event, 'event');
-        default:         return COL_NODE_DEFAULT;
-      }
+    if (selectedIds.has(n.id)) return getComputedStyle(document.documentElement).getPropertyValue('--graph-node-selected').trim()||'#DAF300';
+    switch(nodeColorMode){
+      case 'city': { const c=cityTokenColor(n.city); return c || getBrandColor(n.city,'fallback'); }
+      case 'project': return getBrandColor(firstToken(n.project), 'project');
+      case 'language':return getBrandColor(firstToken(n.language), 'language');
+      case 'event':   return getBrandColor(n.event, 'event');
+      default:        return getComputedStyle(document.documentElement).getPropertyValue('--graph-node').trim()||'#00B08B';
     }
-    // Otherwise muted
-    return MUTED_NODE;
   }
-
   function edgeColor(l){
-    const s = typeof l.source==='object' ? l.source : nodes.find(n=>n.id===l.source);
-    const t = typeof l.target==='object' ? l.target : nodes.find(n=>n.id===l.target);
-    const sId=s.id, tId=t.id;
-
-    // Selection adjacency → white
-    if (selectedIds.has(sId) || selectedIds.has(tId)) return COL_SELECTED;
-
-    // Both endpoints active → rule color
-    const bothActive = activeIds.has(sId) && activeIds.has(tId);
-    if (bothActive){
-      switch(edgeColorMode){
-        case 'same-nodes': return nodeColor(s);
-        case 'by-rule':
-          if (l.kind==='sim')   return 'rgba(200,200,200,0.65)';
-          if (l.kind==='random')return 'rgba(150,150,150,0.45)';
-          return COL_LINK_DEFAULT;
-        default: return COL_LINK_DEFAULT;
-      }
+    const s = typeof l.source==='object'? l.source : nodes.find(n=>n.id===l.source);
+    switch(edgeColorMode){
+      case 'same-nodes': return nodeColor(s);
+      case 'by-rule':
+        if (l.kind==='sim')  return 'rgba(200,200,200,0.65)';
+        if (l.kind==='random') return 'rgba(150,150,150,0.45)';
+        return COL_LINK_DEFAULT;
+      default: return COL_LINK_DEFAULT;
     }
-    return MUTED_LINK;
   }
-
   function applyColors(){
     world.nodeColor(nodeColor);
     world.linkColor(edgeColor);
-    world.linkWidth(l=>{
-      const sId = typeof l.source==='object' ? l.source.id : l.source;
-      const tId = typeof l.target==='object' ? l.target.id : l.target;
-      if (selectedIds.has(sId) || selectedIds.has(tId)) return 2.4 + (l.score||0)*1.2;        // thicker when touching selection
-      if (activeIds.has(sId) && activeIds.has(tId) && l.kind==='sim') return 0.8 + (l.score||0)*0.8;
-      return 0.25; // muted/others
-    });
-    world.nodeOpacity(0.95);  // keep numeric
-    world.linkOpacity(0.18);  // keep numeric
+    world.linkWidth(l => l.kind==='sim' ? (0.3 + 1.2*(l.score||0)) : 0.6);
   }
 
   // ===== Edge building
@@ -493,7 +458,7 @@
   }
 
   function jaccard(aSet,bSet){
-    if (!aSet.size && !bSet.size) return NaN;
+    if (!aSet.size && !bSet.size) return NaN; // no info
     let inter=0;
     if (aSet.size < bSet.size) { aSet.forEach(v=>{ if(bSet.has(v)) inter++; }); }
     else { bSet.forEach(v=>{ if(aSet.has(v)) inter++; }); }
@@ -514,7 +479,7 @@
       }
     }
     if (!scores.length) return 0;
-    return scores.reduce((x,y)=>x+y,0)/scores.length;
+    return scores.reduce((x,y)=>x+y,0)/scores.length; // simple mean
   }
 
   function rebuildLinks(mode){
@@ -528,7 +493,7 @@
         if(!used.has(key)){used.add(key); links.push({source:s,target:t,kind:'random'})}
       }
       world.graphData({nodes,links});
-      applyFilters(); // recolor + recount
+      applyFilters(); // will re-color and count
       return;
     }
 
@@ -573,16 +538,10 @@
       card.addEventListener('click',()=>{const id=card.getAttribute('data-id'), n=nodes.find(x=>x.id===id); if(!n) return; world.cameraPosition({x:(n.x||0)+120,y:(n.y||0)+120,z:(n.z||0)+120},{x:n.x||0,y:n.y||0,z:n.z||0},800);});
     });
   }
-
   function updateCounts(){
-    const visN = activeIds.size || 0;
-    let visE = 0;
-    for (const l of links){
-      const s = typeof l.source==='object' ? l.source.id : l.source;
-      const t = typeof l.target==='object' ? l.target.id : l.target;
-      if (activeIds.has(s) && activeIds.has(t)) visE++;
-    }
-    $counts.textContent = `Visible: ${visN} nodes, ${visE} edges`;
+    const visN=nodes.filter(n=>visible.has(n.id)).length;
+    const visE=links.filter(l=>visible.has(l.source.id||l.source)&&visible.has(l.target.id||l.target)).length;
+    $counts.textContent=`Visible: ${visN} nodes, ${visE} edges`;
   }
 
   const facetDefs=[
@@ -633,70 +592,37 @@
     } return true;
   }
 
-  // ===== Filtering & coloring (graph stays complete)
   function applyFilters(){
-    activeIds.clear();
-    nodes.forEach(n => { if (rowPassesFacets(n) && rowMatchesSearch(n)) activeIds.add(n.id); });
-    recomputeNeighbors();
-
-    renderTable();     // list only active rows
-    updateCounts();    // counts for active subset
-    applyColors();     // recolor graph under current state
+    visible.clear();
+    nodes.forEach(n=>{ if(rowPassesFacets(n) && rowMatchesSearch(n)) visible.add(n.id) });
+    const filtered={
+      nodes: nodes.filter(n=>visible.has(n.id)),
+      links: links.filter(l=>visible.has(l.source.id||l.source) && visible.has(l.target.id||l.target))
+    };
+    world.graphData(filtered);
+    renderTable();
+    updateCounts();
+    applyColors();
   }
 
-  // ===== Table =====
-  let currentTableOrder = nodes.map(n => n.id);
+  let currentTableOrder=[];
   function renderTable(){
-    // data subset
-    const rowsActive = nodes.filter(n => activeIds.has(n.id));
-    // sort
-    rowsActive.sort((a,b)=>{
-      const av=(a[sortCol]||'').toString().toLowerCase();
-      const bv=(b[sortCol]||'').toString().toLowerCase();
-      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-    });
-    currentTableOrder = rowsActive.map(n=>n.id);
-
-    // render
-    const tr = rowsActive.map(n => `
-      <tr data-id="${n.id}" class="${selectedIds.has(n.id)?'selected':''}">
-        <td>${n.last||''}</td>
-        <td>${n.first||''}</td>
-        <td>${n.email||''}</td>
-        <td>${n.city||''}</td>
-        <td>${n.event||''}</td>
-        <td>${n.project||''}</td>
-        <td>${n.language||''}</td>
-        <td>${n.experience||''}</td>
-        <td>${n.expertise||''}</td>
-      </tr>`).join('');
-    $tbody.innerHTML = tr || `<tr><td colspan="9" class="muted">No rows</td></tr>`;
-
-    // row handlers (click/shift/cmd multi-select)
-    const rowsEls = Array.from($tbody.querySelectorAll('tr'));
-    rowsEls.forEach((rowEl, idx) => {
-      rowEl.onclick = (ev) => {
-        const id = rowEl.getAttribute('data-id');
-        const node = nodes.find(n=>n.id===id);
-        if(!node) return;
-
-        if (ev.shiftKey && lastClickedIndex != null) {
-          const a = Math.min(lastClickedIndex, idx), b = Math.max(lastClickedIndex, idx);
-          selectedIds.clear();
-          for (let i=a;i<=b;i++) selectedIds.add(currentTableOrder[i]);
-        } else if (ev.metaKey || ev.ctrlKey) {
-          if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
-          lastClickedIndex = idx;
-        } else {
-          if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
-          lastClickedIndex = idx;
-        }
-        renderSelectedCards();
-        applyFilters();   // recolor under new selection
-      };
+    const arr=nodes.filter(n=>visible.has(n.id)).sort((a,b)=>(a[sortCol]>b[sortCol]?(sortAsc?1:-1):(sortAsc?-1:1)));
+    currentTableOrder=arr.map(n=>n.id);
+    $tbody.innerHTML='';
+    arr.forEach((n,idx)=>{
+      const tr=document.createElement('tr'); tr.dataset.id=n.id;
+      tr.innerHTML=`<td>${n.last||""}</td><td>${n.first||""}</td><td>${n.email||""}</td><td>${n.city||""}</td><td>${n.event||""}</td><td>${n.project||""}</td><td>${n.language||""}</td><td>${n.experience||""}</td><td>${n.expertise||""}</td>`;
+      if(selectedIds.has(n.id)) tr.classList.add('selected');
+      tr.addEventListener('click',(ev)=>onRowClick(ev,n,idx)); $tbody.appendChild(tr);
     });
   }
-
+  function onRowClick(ev,node,idx){
+    if(ev.shiftKey && lastClickedIndex!=null && currentTableOrder.length){const a=Math.min(lastClickedIndex,idx), b=Math.max(lastClickedIndex,idx); for(let i=a;i<=b;i++) selectedIds.add(currentTableOrder[i])}
+    else if(ev.metaKey||ev.ctrlKey){ if(selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id); lastClickedIndex=idx }
+    else { if(selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id); lastClickedIndex=idx }
+    renderSelectedCards(); applyFilters();
+  }
   function toggleSelectById(id){
     if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
     const tr=$tbody.querySelector(`tr[data-id="${id}"]`); if(tr) tr.scrollIntoView({block:'nearest'});
@@ -720,7 +646,6 @@
 
   $reset.onclick=()=>{ frameToBounds(4.2); selectedIds.clear(); lastClickedIndex=null;
     for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) }
-    setSearchTerms(''); const s=document.getElementById('globalSearch'); if (s) s.value='';
     renderSelectedCards(); rebuildLinks($edgeMode.value);
   };
   $clearSel.onclick=()=>{ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
