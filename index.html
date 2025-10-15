@@ -89,6 +89,30 @@
     .legend .sep{ height:1px; background:rgba(255,255,255,.08); margin:8px 0 }
     .legend .more{ color:#9aa0a6; font-style:italic }
 
+    /* Legend toggle button */
+    .legend-toggle{
+      position:absolute; top:10px; right:10px;
+      padding:6px 10px; border-radius:999px;
+      border:1px solid rgba(214,255,79,.9);
+      background:rgba(12,12,12,.6);
+      color:#D6FF4F; font-weight:700; font-size:12px; cursor:pointer;
+      backdrop-filter: blur(4px);
+    }
+    .legend-toggle:focus{ outline:2px solid #D6FF4F; outline-offset:2px }
+
+    /* Hidden / collapsed states */
+    .legend.is-hidden{ opacity:0; pointer-events:none; transform:translateY(-6px); transition:.16s ease }
+    .legend.is-shown{ opacity:1; transform:none; transition:.16s ease }
+
+    /* Default: show; small screens: start hidden as a pop-up */
+    @media (max-width: 1100px){
+      .legend{ top:auto; bottom:10px; right:10px; left:10px; max-width:none }
+    }
+
+    /* Make muted swatch more readable on dark bg */
+    .legend .swatch{ box-shadow:0 0 0 0.5px rgba(0,0,0,.5) }
+
+
   </style>
 
   <script src="https://unpkg.com/3d-force-graph"></script>
@@ -227,6 +251,24 @@
     box.innerHTML = nodeLegendHTML + edgeLegendHTML;
   }
 
+  /* ---- Legend show/hide controller ---- */
+  function setLegendVisible(v){
+    const box = document.getElementById('legend');
+    const btn = document.getElementById('legendToggle');
+    if (!box || !btn) return;
+    box.classList.toggle('is-hidden', !v);
+    box.classList.toggle('is-shown',  !!v);
+    btn.setAttribute('aria-expanded', String(!!v));
+    localStorage.setItem('legend:visible', String(!!v));
+  }
+  function getLegendInitialVisibility(){
+    const saved = localStorage.getItem('legend:visible');
+    if (saved !== null) return saved === 'true';
+    // default: visible on wide screens, hidden on narrow
+    return window.matchMedia('(min-width: 1100px)').matches;
+  }
+
+
 
   </script>
 </head>
@@ -284,7 +326,7 @@
           <div class="box-body" id="coloring-body">
             <label style="margin-top:0">Node color by</label>
             <select id="nodeColorBy">
-              <option value="city" selected>City (brand)</option>
+              <option value="city" selected>City</option>
               <option value="project">Edgelands Project</option>
               <option value="language">Language</option>
               <option value="event">Event/Connection</option>
@@ -334,7 +376,8 @@
   </div>
 
   <!-- Graph -->
-  <div id="graph" class="vis3d"><div id="3d"></div><div id="legend" class="legend"></div></div>
+  <div id="graph" class="vis3d"><div id="3d"></div> <div id="legend" class="legend"></div><button id="legendToggle" class="legend-toggle" aria-expanded="true" aria-controls="legend">Legend</button></div>
+
 
   <!-- Right -->
   <div id="right" class="panel">
@@ -411,6 +454,8 @@
   const $filters=document.getElementById('filters');
   const $nodeColorBy=document.getElementById('nodeColorBy');
   const $edgeColorBy=document.getElementById('edgeColorBy');
+  const $legendToggle = document.getElementById('legendToggle');
+
 
   // --- Global search refs/state ---
   const $search = document.getElementById('globalSearch');
@@ -807,6 +852,7 @@ function applyColors(){
     const sim = $edgeMode.value==='similarity';
     $simOptions.style.display = sim ? 'block' : 'none';
     rebuildLinks($edgeMode.value);
+    setLegendVisible(getLegendInitialVisibility());
   };
   $th.oninput=()=>{ $thLbl.textContent = $th.value + '%'; rebuildLinks($edgeMode.value); };
   ['language','project','city','expertise','experience'].forEach(k=>{
@@ -820,6 +866,16 @@ function applyColors(){
   };
   $clearSel.onclick=()=>{ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
   $clearAllFilters.onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } applyFilters() };
+  $legendToggle.onclick = () => {const expanded = $legendToggle.getAttribute('aria-expanded') === 'true'; setLegendVisible(!expanded);};
+  // Keyboard shortcut: press "L" to toggle
+  document.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'l' && !e.metaKey && !e.ctrlKey && !e.altKey){
+      e.preventDefault();
+      const expanded = $legendToggle.getAttribute('aria-expanded') === 'true';
+      setLegendVisible(!expanded);
+    }
+  });
+
 
   // Init
   buildFacets();
