@@ -75,6 +75,20 @@
     table.table th, table.table td{ border-top:1px solid var(--app-border); padding:6px 8px; text-align:left }
     table.table thead th{ background: rgba(255,255,255,.06); position:sticky; top:0; cursor:pointer; user-select:none; text-transform:uppercase; letter-spacing:.06em; font-family: var(--font-display,var(--font-sans)) }
     tr.selected{ background: rgba(217,255,75,.12) }
+    .legend{
+      position:absolute; top:10px; right:10px; max-width:280px;
+      background:rgba(10,10,10,.8); border:1px solid rgba(255,255,255,.08);
+      border-radius:12px; padding:10px 12px; font-size:12px; color:#e8e8e8;
+      backdrop-filter: blur(4px);
+    }
+    .legend h3{ margin:0 0 8px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#9aa0a6 }
+    .legend .row{ display:flex; align-items:center; gap:8px; margin:4px 0 }
+    .legend .swatch{ width:12px; height:12px; border-radius:50%; border:1px solid rgba(255,255,255,.25); flex:0 0 auto }
+    .legend .meta{ margin-left:auto; color:#9aa0a6 }
+    .legend .muted{ color:#9aa0a6 }
+    .legend .sep{ height:1px; background:rgba(255,255,255,.08); margin:8px 0 }
+    .legend .more{ color:#9aa0a6; font-style:italic }
+
   </style>
 
   <script src="https://unpkg.com/3d-force-graph"></script>
@@ -142,6 +156,78 @@
     return v || null;
   }
   function firstToken(v){ return (v||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)[0] || '' }
+
+  const LEGEND_MAX = 12;
+
+  function colorForNodeKeyByMode(key){
+    switch (nodeColorMode){
+      case 'city':    return cityTokenColor(key) || getBrandColor(key,'fallback');
+      case 'project': return getBrandColor(firstToken(key),'project');
+      case 'language':return getBrandColor(firstToken(key),'language');
+      case 'event':   return getBrandColor(key,'event');
+      default:        return COL_NODE_DEFAULT;
+    }
+  }
+  function titleForMode(){
+    switch (nodeColorMode){
+      case 'city': return 'Nodes colored by: City';
+      case 'project': return 'Nodes colored by: Edgelands Project';
+      case 'language': return 'Nodes colored by: Language';
+      case 'event': return 'Nodes colored by: Event/Connection';
+      default: return 'Nodes colored by: None';
+    }
+  }
+
+  // Build [{key,label,count,color}] from CURRENTLY ACTIVE nodes
+  function legendBuckets(nodes, activeIds){
+    const counts = new Map();
+    for (const n of nodes){
+      if (!activeIds.has(n.id)) continue; // legend mirrors the visible subset
+      let keys = [];
+      if (nodeColorMode === 'city')       keys = [(n.city||'').trim()].filter(Boolean);
+      else if (nodeColorMode === 'event') keys = [(n.event||'').trim()].filter(Boolean);
+      else if (nodeColorMode === 'project')  keys = (n.project||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean);
+      else if (nodeColorMode === 'language') keys = (n.language||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean);
+      keys.forEach(k => counts.set(k, (counts.get(k)||0)+1));
+    }
+    const rows = [...counts.entries()].map(([key,count]) => ({
+      key, label: key || '(empty)', count, color: colorForNodeKeyByMode(key||'')
+    }));
+    rows.sort((a,b)=> b.count - a.count || a.label.localeCompare(b.label));
+    return rows;
+  }
+
+  function renderLegend(nodes, activeIds){
+    const box = document.getElementById('legend');
+    if (!box) return;
+
+    const buckets = legendBuckets(nodes, activeIds);
+    const shown = buckets.slice(0, LEGEND_MAX);
+    const more = Math.max(0, buckets.length - shown.length);
+
+    const nodeLegendHTML = `
+      <h3>${titleForMode()}</h3>
+      ${shown.map(b=>`
+        <div class="row">
+          <span class="swatch" style="background:${b.color}"></span>
+          <span>${b.label}</span>
+          <span class="meta">${b.count}</span>
+        </div>`).join('')}
+      ${more ? `<div class="more">+${more} more…</div>` : ''}
+    `;
+
+    const edgeLegendHTML = `
+      <div class="sep"></div>
+      <h3>Edges</h3>
+      <div class="row"><span class="swatch" style="background:#fff"></span><span>Selected connection(s)</span></div>
+      <div class="row"><span class="swatch" style="background:rgba(200,200,200,.85)"></span><span>Similarity edge</span></div>
+      <div class="row"><span class="swatch" style="background:${MUTED_LINK}"></span><span class="muted">Muted (filtered-out)</span></div>
+    `;
+
+    box.innerHTML = nodeLegendHTML + edgeLegendHTML;
+  }
+
+
   </script>
 </head>
 
@@ -248,7 +334,7 @@
   </div>
 
   <!-- Graph -->
-  <div id="graph" class="vis3d"><div id="3d"></div></div>
+  <div id="graph" class="vis3d"><div id="3d"></div><div id="legend" class="legend"></div></div>
 
   <!-- Right -->
   <div id="right" class="panel">
@@ -411,8 +497,9 @@
   }
 
   // ===== State → colors & widths
-  let nodeColorMode='city';
-  let edgeColorMode='by-rule';
+  window.nodeColorMode = 'city';
+  window.edgeColorMode = 'by-rule';
+
 
   function recomputeNeighbors(){
     neighborIds.clear();
@@ -647,6 +734,8 @@ function applyColors(){
     renderTable();     // list only active rows
     updateCounts();    // counts for active subset
     applyColors();     // recolor graph under current state
+    renderLegend(nodes, activeIds);
+
   }
 
   // ===== Table =====
@@ -710,8 +799,9 @@ function applyColors(){
 
   // UI wiring
   document.querySelectorAll('#tbl thead th').forEach(th=>{ th.onclick=()=>{ const c=th.dataset.col; sortAsc=(sortCol===c)?!sortAsc:true; sortCol=c; renderTable() }});
-  document.getElementById('nodeColorBy').onchange=()=>{ nodeColorMode=$nodeColorBy.value; applyColors(); };
-  document.getElementById('edgeColorBy').onchange=()=>{ edgeColorMode=$edgeColorBy.value; applyColors(); };
+  document.getElementById('nodeColorBy').onchange=()=>{window.nodeColorMode = $nodeColorBy.value;applyColors();renderLegend(nodes, activeIds);};
+
+  // document.getElementById('edgeColorBy').onchange=()=>{ edgeColorMode=$edgeColorBy.value; applyColors(); };
 
   $edgeMode.onchange=()=>{
     const sim = $edgeMode.value==='similarity';
@@ -726,7 +816,7 @@ function applyColors(){
   $reset.onclick=()=>{ frameToBounds(4.2); selectedIds.clear(); lastClickedIndex=null;
     for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) }
     setSearchTerms(''); const s=document.getElementById('globalSearch'); if (s) s.value='';
-    renderSelectedCards(); rebuildLinks($edgeMode.value);
+    renderSelectedCards(); rebuildLinks($edgeMode.value); renderLegend(nodes, activeIds);
   };
   $clearSel.onclick=()=>{ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
   $clearAllFilters.onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } applyFilters() };
