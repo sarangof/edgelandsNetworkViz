@@ -25,7 +25,7 @@
     #left{ grid-area:left; padding:12px; overflow:auto }
     #right{ grid-area:right; padding:12px; overflow:auto }
     #graph.vis3d{ grid-area:graph; position:relative; background: var(--graph-background,#0b0b0b); border:1px solid var(--app-border); border-radius:14px; height:100%; min-height:0; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.3) }
-    #graph>div{ position:absolute; inset:0 }
+    #graph > #3d { position:absolute; inset:0 }
 
     #bottom{ grid-area:bottom; padding:12px; overflow:auto; height:40vh; max-height:100vh; position:relative; z-index:2 }
     #counts{ font-size:13px; color: var(--col-muted,#9aa0a6); margin:0 0 6px 0 }
@@ -75,39 +75,52 @@
     table.table th, table.table td{ border-top:1px solid var(--app-border); padding:6px 8px; text-align:left }
     table.table thead th{ background: rgba(255,255,255,.06); position:sticky; top:0; cursor:pointer; user-select:none; text-transform:uppercase; letter-spacing:.06em; font-family: var(--font-display,var(--font-sans)) }
     tr.selected{ background: rgba(217,255,75,.12) }
+  
+    /* Legend overlay — small, bottom-right, scrollable */
     .legend{
-      position:absolute; top:10px; right:10px; max-width:280px;
-      background:rgba(10,10,10,.8); border:1px solid rgba(255,255,255,.08);
-      border-radius:12px; padding:10px 12px; font-size:12px; color:#e8e8e8;
+      position:absolute;
+      bottom:10px; right:10px; top:auto; left:auto;   
+      width:260px;                                    
+      max-height:calc(50% - 20px);                    
+      overflow-y:auto;                                 
+      background:rgba(10,10,10,.85);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;
+      padding:8px 10px;
+      font-size:12px; color:#e8e8e8;  
       backdrop-filter: blur(4px);
+      z-index:3;
     }
-    .legend h3{ margin:0 0 8px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#9aa0a6 }
-    .legend .row{ display:flex; align-items:center; gap:8px; margin:4px 0 }
-    .legend .swatch{ width:12px; height:12px; border-radius:50%; border:1px solid rgba(255,255,255,.25); flex:0 0 auto }
+    .legend h3{ margin:0 0 6px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#9aa0a6 }
+    .legend .row{ display:flex; align-items:center; gap:8px; margin:3px 0 }
+    .legend .swatch{ width:12px; height:12px; border-radius:50%; border:1px solid rgba(255,255,255,.25); flex:0 0 auto; box-shadow:0 0 0 0.5px rgba(0,0,0,.5) }
     .legend .meta{ margin-left:auto; color:#9aa0a6 }
     .legend .muted{ color:#9aa0a6 }
-    .legend .sep{ height:1px; background:rgba(255,255,255,.08); margin:8px 0 }
+    .legend .sep{ height:1px; background:rgba(255,255,255,.08); margin:6px 0 }
     .legend .more{ color:#9aa0a6; font-style:italic }
 
-    /* Legend toggle button */
+    /* Toggle button — bottom-right too */
     .legend-toggle{
-      position:absolute; top:10px; right:10px;
+      position:absolute; bottom:10px; right:10px; top:auto; left:auto;
       padding:6px 10px; border-radius:999px;
       border:1px solid rgba(214,255,79,.9);
       background:rgba(12,12,12,.6);
       color:#D6FF4F; font-weight:700; font-size:12px; cursor:pointer;
       backdrop-filter: blur(4px);
+      z-index:4; /* above legend */
     }
     .legend-toggle:focus{ outline:2px solid #D6FF4F; outline-offset:2px }
 
-    /* Hidden / collapsed states */
-    .legend.is-hidden{ opacity:0; pointer-events:none; transform:translateY(-6px); transition:.16s ease }
-    .legend.is-shown{ opacity:1; transform:none; transition:.16s ease }
+    /* Hidden / shown states (no pointer events when hidden) */
+    .legend.is-hidden{ opacity:0; pointer-events:none; transform:translateY(6px); transition:.16s ease }
+    .legend.is-shown { opacity:1; transform:none; transition:.16s ease }
+    .legend.is-shown + .legend-toggle { transform: translateY(-56px); }
 
-    /* Default: show; small screens: start hidden as a pop-up */
-    @media (max-width: 1100px){
-      .legend{ top:auto; bottom:10px; right:10px; left:10px; max-width:none }
+    /* Responsive: widen slightly on very small screens */
+    @media (max-width: 640px){
+      .legend{ width:auto; left:10px; right:10px; max-height:40% }
     }
+
 
     /* Make muted swatch more readable on dark bg */
     .legend .swatch{ box-shadow:0 0 0 0.5px rgba(0,0,0,.5) }
@@ -264,9 +277,9 @@
   function getLegendInitialVisibility(){
     const saved = localStorage.getItem('legend:visible');
     if (saved !== null) return saved === 'true';
-    // default: visible on wide screens, hidden on narrow
-    return window.matchMedia('(min-width: 1100px)').matches;
+    return false;  // default: hidden on first load
   }
+
 
 
 
@@ -376,7 +389,7 @@
   </div>
 
   <!-- Graph -->
-  <div id="graph" class="vis3d"><div id="3d"></div> <div id="legend" class="legend"></div><button id="legendToggle" class="legend-toggle" aria-expanded="true" aria-controls="legend">Legend</button></div>
+  <div id="graph" class="vis3d"><div id="3d"></div> <div id="legend" class="legend"></div><button id="legendToggle" class="legend-toggle" aria-expanded="false" aria-controls="legend">Legend</button></div>
 
 
   <!-- Right -->
@@ -852,6 +865,7 @@ function applyColors(){
     const sim = $edgeMode.value==='similarity';
     $simOptions.style.display = sim ? 'block' : 'none';
     rebuildLinks($edgeMode.value);
+    setLegendVisible(false);  // hide on first load to avoid interference
     setLegendVisible(getLegendInitialVisibility());
   };
   $th.oninput=()=>{ $thLbl.textContent = $th.value + '%'; rebuildLinks($edgeMode.value); };
@@ -882,8 +896,8 @@ function applyColors(){
   renderTable();
   renderSelectedCards();
 
-  // Build edges initially (similarity)
   rebuildLinks($edgeMode.value);
+  setLegendVisible(false);
 })();
 </script>
 </body>
