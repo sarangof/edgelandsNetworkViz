@@ -132,12 +132,15 @@
     /* Floating action pills (bottom-left) */
     #resetFloating{ left:10px; right:auto }
     #clearSelFloating{ left:120px; right:auto }
+    #clearFiltersFloating{ left:230px; right:auto }   /* ← add */
+
 
     /* Responsive: widen legend slightly on narrow screens */
     @media (max-width: 640px){
       .legend{ width:auto; left:10px; right:10px; max-height:40% }
       #resetFloating{ left:10px }
       #clearSelFloating{ left:110px }
+      #clearFiltersFloating{ left:210px } 
     }
 
     .navinfo{
@@ -534,6 +537,7 @@
     <!-- Floating action pills -->
     <button id="resetFloating" class="pill">Reset view</button>
     <button id="clearSelFloating" class="pill">Clear selection</button>
+    <button id="clearFiltersFloating" class="pill">Clear filters</button>
   </div>
 
   <!-- Right -->
@@ -675,6 +679,8 @@
     .linkOpacity(0.18)
     .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim()||'#0b0b0b')
     .onNodeClick(n=>toggleSelectById(n.id));
+    world.onBackgroundClick(() => {selectedIds.clear(); lastClickedIndex = null; renderSelectedCards(); applyFilters();});
+
 
   
   world.showNavInfo(false);  
@@ -751,16 +757,36 @@
   function applyColors(){
     world.nodeColor(nodeColor);
     world.linkColor(edgeColor);
+
+    // Widths: thin in neutral; only incumbent edges get thick when something is selected
     world.linkWidth(l => {
       const sId = typeof l.source==='object' ? l.source.id : l.source;
       const tId = typeof l.target==='object' ? l.target.id : l.target;
-      if (selectedIds.has(sId) || selectedIds.has(tId)) return 3.6 + (l.score||0)*1.6;
-      if (activeIds.has(sId) && activeIds.has(tId) && l.kind==='sim') return 0.9 + (l.score||0)*0.8;
-      return 0.22;
+
+      const touchesSel = selectedIds.has(sId) || selectedIds.has(tId);
+      if (touchesSel) return 3.6 + (l.score||0)*1.6;   // only edges touching selection
+
+      if (selectedIds.size) return 0.22;               // others stay thin during selection
+
+      // Neutral (no selection): keep everything thin (previous look)
+      return 0.24;
     });
-    world.linkOpacity(selectedIds.size ? 0.33 : 0.18);
+
+    // Opacity: selected edges pop; others stay calm (no unintended brightening)
+    world.linkOpacity(l => {
+      const sId = typeof l.source==='object' ? l.source.id : l.source;
+      const tId = typeof l.target==='object' ? l.target.id : l.target;
+
+      const touchesSel = selectedIds.has(sId) || selectedIds.has(tId);
+      if (touchesSel) return 0.9;                      // incumbent edges bright when selected
+      if (selectedIds.size) return 0.08;               // non-incumbent edges dim during selection
+      return 0.16;                                     // neutral state
+    });
+
+
     world.nodeOpacity(0.95);
   }
+
 
   // ===== Edge building (unchanged)
   function getSimilaritySettings(){
@@ -996,8 +1022,8 @@
 
   // UI wiring
   document.querySelectorAll('#tbl thead th').forEach(th=>{ th.onclick=()=>{ const c=th.dataset.col; sortAsc=(sortCol===c)?!sortAsc:true; sortCol=c; renderTable() }});
-  document.getElementById('nodeColorBy').onchange=()=>{ window.nodeColorMode = $nodeColorBy.value; applyColors(); renderLegend(nodes, activeIds); setLegendVisible(true);
-};
+  document.getElementById('nodeColorBy').onchange=()=>{ window.nodeColorMode = $nodeColorBy.value; applyColors(); renderLegend(nodes, activeIds); setLegendVisible(true);};
+  document.getElementById('clearAllFilters').onclick = doClearFilters;
 
   $edgeMode.onchange=()=>{
     const sim = $edgeMode.value==='similarity';
@@ -1011,6 +1037,22 @@
     document.getElementById('simChk-'+k).onchange=()=>rebuildLinks($edgeMode.value);
   });
 
+
+  function doClearFilters(){
+  // clear facet selections
+    for (const def of facetDefs){
+      selectedFacets[def.key].clear();
+      const wrap = document.querySelector(`.facet[data-key="${def.key}"]`);
+      if (wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
+    // clear global search
+    setSearchTerms('');
+    const s = document.getElementById('globalSearch');
+    if (s) s.value = '';
+    applyFilters();
+  }
+
+
   // Floating action pills
   function doReset(){
     frameToBounds(4.2); selectedIds.clear(); lastClickedIndex=null;
@@ -1022,6 +1064,8 @@
 
   $resetFloating.onclick = doReset;
   $clearSelFloating.onclick = doClearSel;
+  document.getElementById('clearFiltersFloating').onclick = doClearFilters;
+
 
   // Legend pill + keyboard
   $legendToggle.onclick = () => { const expanded = $legendToggle.getAttribute('aria-expanded') === 'true'; setLegendVisible(!expanded); };
