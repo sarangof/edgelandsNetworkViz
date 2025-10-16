@@ -12,7 +12,7 @@
     html, body { height:100%; margin:0; font-family: var(--font-sans, system-ui,-apple-system,Segoe UI,Roboto,sans-serif) }
     #layout{
       display:grid;
-      grid-template-columns:380px 1fr 340px;
+      grid-template-columns:320px 1fr 340px;
       grid-template-rows: 60% 40%;
       grid-template-areas:
         "left graph right"
@@ -28,7 +28,7 @@
     /* only the 3D host fills the panel */
     #graph > #3d { position:absolute; inset:0 }
 
-    #bottom{ grid-area:bottom; padding:12px; overflow:auto; height:40vh; max-height:100vh; position:relative; z-index:2 }
+    #bottom{ grid-area:bottom; padding:12px; overflow:auto; height:32vh; max-height:100vh; position:relative; z-index:2 }
     #counts{ font-size:13px; color: var(--col-muted,#9aa0a6); margin:0 0 6px 0 }
 
     h2{margin:0 0 10px; font-size:16px; font-weight:700; font-family: var(--font-display,var(--font-sans)) }
@@ -102,7 +102,14 @@
     .legend .meta{ margin-left:auto; color:#9aa0a6 }
     .legend .more{ color:#9aa0a6; font-style:italic }
     .legend.is-hidden{ opacity:0; pointer-events:none; transform:translateY(6px); transition:.16s ease }
-    .legend.is-shown { opacity:1; transform:none; transition:.16s ease }
+    .legend.is-shown + #legendToggle{ display:none; }
+    .legend-head{ display:flex; align-items:center; gap:8px; }
+    .legend-head h3{ margin:0; flex:1; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#9aa0a6 }
+    .legend-close{
+      all:unset; cursor:pointer; padding:2px 6px; border-radius:8px;
+      border:1px solid rgba(214,255,79,.6); color:#D6FF4F; font-weight:700; font-size:12px;
+    }
+
 
     /* Toggle pills */
     .pill{
@@ -115,8 +122,12 @@
       z-index:4;
     }
     .pill:focus{ outline:2px solid #D6FF4F; outline-offset:2px }
-    /* legend pill nudged when legend open */
-    .legend.is-shown + #legendToggle{ transform: translateY(-56px); }
+    /* when legend is open, move the pill left of the legend */
+    .legend.is-shown + #legendToggle{
+      right: calc(260px + 16px);  /* legend width + gap */
+      transform: none;
+    }
+
 
     /* Floating action pills (bottom-left) */
     #resetFloating{ left:10px; right:auto }
@@ -128,6 +139,17 @@
       #resetFloating{ left:10px }
       #clearSelFloating{ left:110px }
     }
+
+    .navinfo{
+      position:absolute; top:10px; left:50%; transform:translateX(-50%);
+      padding:6px 10px; border-radius:10px;
+      background:rgba(10,10,10,.75); border:1px solid rgba(255,255,255,.08);
+      color:#cfcfcf; font-size:11px; letter-spacing:.02em;
+      pointer-events:none; z-index:4;
+    }
+
+
+
   </style>
 
   <script src="https://unpkg.com/3d-force-graph"></script>
@@ -353,10 +375,20 @@
     })() : '';
 
     box.innerHTML = `
-      <h3>${titleForMode()}</h3>
+      <div class="legend-head">
+        <h3>${titleForMode()}</h3>
+        <button class="legend-close" aria-label="Close legend">×</button>
+      </div>
       ${rowsHTML}
       ${otherHTML}
     `;
+
+    box.querySelector('.legend-close')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setLegendVisible(false);
+    });
+
+
 
     // Wire interactivity → toggle facet selections
     box.querySelectorAll('.legend-item').forEach(row => {
@@ -643,6 +675,14 @@
     .linkOpacity(0.18)
     .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim()||'#0b0b0b')
     .onNodeClick(n=>toggleSelectById(n.id));
+
+  
+  world.showNavInfo(false);  
+  const navTip = document.createElement('div');
+  navTip.className = 'navinfo';
+  navTip.textContent = 'Left click: rotate · Wheel/middle: zoom · Right click: pan';
+  document.getElementById('graph').appendChild(navTip);
+
 
   // One-time frame after layout starts
   setTimeout(()=>frameToBounds(4.2), 900);
