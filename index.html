@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>3D People Network — Similarity edges</title>
+  <title>EDGELANDS PEOPLE NETWORK</title>
 
   <!-- Brand + fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Georama:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -25,6 +25,7 @@
     #left{ grid-area:left; padding:12px; overflow:auto }
     #right{ grid-area:right; padding:12px; overflow:auto }
     #graph.vis3d{ grid-area:graph; position:relative; background: var(--graph-background,#0b0b0b); border:1px solid var(--app-border); border-radius:14px; height:100%; min-height:0; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.3) }
+    /* only the 3D host fills the panel */
     #graph > #3d { position:absolute; inset:0 }
 
     #bottom{ grid-area:bottom; padding:12px; overflow:auto; height:40vh; max-height:100vh; position:relative; z-index:2 }
@@ -52,13 +53,17 @@
     .box.is-closed .box-toggle::after{ transform:rotate(-90deg) }
     .box.is-closed .box-body{ display:none }
 
-    /* Facets */
-    .facet{ margin-top:12px; border:1px solid var(--app-border); border-radius:12px; background:#121212; padding:10px }
-    .facet-title{ display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:700; margin:0 0 8px }
-    .facet-actions{ display:flex; gap:6px }
-    .facet-actions button{ font-size:11px; padding:4px 8px }
+    /* Facets (now individually collapsible) */
+    .facet{ margin-top:12px; border:1px solid var(--app-border); border-radius:12px; background:#121212; }
+    .facet-header{ display:flex; align-items:center; justify-content:space-between; padding:10px; cursor:pointer }
+    .facet-header .title{ font-size:13px; font-weight:700 }
+    .facet-header .actions{ display:flex; gap:6px }
+    .facet-body{ padding:10px; border-top:1px solid var(--app-border) }
     .facet-list{ max-height:160px; overflow:auto; padding-right:4px; display:grid; grid-template-columns:1fr; gap:6px }
     .facet-item{ display:flex; align-items:center; gap:8px; font-size:13px }
+    .facet.is-collapsed .facet-body{ display:none }
+    .facet.is-collapsed .facet-header::after{ content:"▸"; margin-left:8px; opacity:.8 }
+    .facet:not(.is-collapsed) .facet-header::after{ content:"▾"; margin-left:8px; opacity:.8 }
 
     /* Right cards */
     .cards{display:grid; gap:10px; margin-top:8px}
@@ -75,19 +80,19 @@
     table.table th, table.table td{ border-top:1px solid var(--app-border); padding:6px 8px; text-align:left }
     table.table thead th{ background: rgba(255,255,255,.06); position:sticky; top:0; cursor:pointer; user-select:none; text-transform:uppercase; letter-spacing:.06em; font-family: var(--font-display,var(--font-sans)) }
     tr.selected{ background: rgba(217,255,75,.12) }
-  
+
     /* Legend overlay — small, bottom-right, scrollable */
     .legend{
       position:absolute;
-      bottom:10px; right:10px; top:auto; left:auto;   
-      width:260px;                                    
-      max-height:calc(50% - 20px);                    
-      overflow-y:auto;                                 
+      bottom:10px; right:10px; top:auto; left:auto;
+      width:260px;
+      max-height:calc(50% - 20px);
+      overflow-y:auto;
       background:rgba(10,10,10,.85);
       border:1px solid rgba(255,255,255,.08);
       border-radius:12px;
       padding:8px 10px;
-      font-size:12px; color:#e8e8e8;  
+      font-size:12px; color:#e8e8e8;
       backdrop-filter: blur(4px);
       z-index:3;
     }
@@ -95,37 +100,34 @@
     .legend .row{ display:flex; align-items:center; gap:8px; margin:3px 0 }
     .legend .swatch{ width:12px; height:12px; border-radius:50%; border:1px solid rgba(255,255,255,.25); flex:0 0 auto; box-shadow:0 0 0 0.5px rgba(0,0,0,.5) }
     .legend .meta{ margin-left:auto; color:#9aa0a6 }
-    .legend .muted{ color:#9aa0a6 }
-    .legend .sep{ height:1px; background:rgba(255,255,255,.08); margin:6px 0 }
     .legend .more{ color:#9aa0a6; font-style:italic }
+    .legend.is-hidden{ opacity:0; pointer-events:none; transform:translateY(6px); transition:.16s ease }
+    .legend.is-shown { opacity:1; transform:none; transition:.16s ease }
 
-    /* Toggle button — bottom-right too */
-    .legend-toggle{
-      position:absolute; bottom:10px; right:10px; top:auto; left:auto;
+    /* Toggle pills */
+    .pill{
+      position:absolute; bottom:10px; right:10px;
       padding:6px 10px; border-radius:999px;
       border:1px solid rgba(214,255,79,.9);
       background:rgba(12,12,12,.6);
       color:#D6FF4F; font-weight:700; font-size:12px; cursor:pointer;
       backdrop-filter: blur(4px);
-      z-index:4; /* above legend */
+      z-index:4;
     }
-    .legend-toggle:focus{ outline:2px solid #D6FF4F; outline-offset:2px }
+    .pill:focus{ outline:2px solid #D6FF4F; outline-offset:2px }
+    /* legend pill nudged when legend open */
+    .legend.is-shown + #legendToggle{ transform: translateY(-56px); }
 
-    /* Hidden / shown states (no pointer events when hidden) */
-    .legend.is-hidden{ opacity:0; pointer-events:none; transform:translateY(6px); transition:.16s ease }
-    .legend.is-shown { opacity:1; transform:none; transition:.16s ease }
-    .legend.is-shown + .legend-toggle { transform: translateY(-56px); }
+    /* Floating action pills (bottom-left) */
+    #resetFloating{ left:10px; right:auto }
+    #clearSelFloating{ left:120px; right:auto }
 
-    /* Responsive: widen slightly on very small screens */
+    /* Responsive: widen legend slightly on narrow screens */
     @media (max-width: 640px){
       .legend{ width:auto; left:10px; right:10px; max-height:40% }
+      #resetFloating{ left:10px }
+      #clearSelFloating{ left:110px }
     }
-
-
-    /* Make muted swatch more readable on dark bg */
-    .legend .swatch{ box-shadow:0 0 0 0.5px rgba(0,0,0,.5) }
-
-
   </style>
 
   <script src="https://unpkg.com/3d-force-graph"></script>
@@ -173,12 +175,11 @@
   // Brand tokens & palette
   const css=getComputedStyle(document.documentElement);
   const COL_NODE_DEFAULT = css.getPropertyValue('--graph-node').trim()||'#00B08B';
-  const COL_LINK_DEFAULT = css.getPropertyValue('--graph-link').trim()||'rgba(180,180,180,0.6)';
 
   // Selection & muting colors (white reserved for selection)
   const COL_SELECTED = '#FFFFFF';
   const MUTED_NODE   = '#2a2a2a';
-  const MUTED_LINK   = '#141414'; //'#202020'; 
+  const MUTED_LINK   = '#141414';
 
   const BRAND_PALETTE = ['#335852','#70AF94','#D85751','#E2F16C','#473B36','#BCCFC8'];
   const colorMap = { project:new Map(), language:new Map(), event:new Map(), fallback:new Map() };
@@ -194,8 +195,8 @@
   }
   function firstToken(v){ return (v||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)[0] || '' }
 
+  /* ---- Legend helpers ----*/
   const LEGEND_MAX = 12;
-
   function colorForNodeKeyByMode(key){
     switch (nodeColorMode){
       case 'city':    return cityTokenColor(key) || getBrandColor(key,'fallback');
@@ -214,12 +215,10 @@
       default: return 'Nodes colored by: None';
     }
   }
-
-  // Build [{key,label,count,color}] from CURRENTLY ACTIVE nodes
   function legendBuckets(nodes, activeIds){
     const counts = new Map();
     for (const n of nodes){
-      if (!activeIds.has(n.id)) continue; // legend mirrors the visible subset
+      if (!activeIds.has(n.id)) continue;
       let keys = [];
       if (nodeColorMode === 'city')       keys = [(n.city||'').trim()].filter(Boolean);
       else if (nodeColorMode === 'event') keys = [(n.event||'').trim()].filter(Boolean);
@@ -233,16 +232,13 @@
     rows.sort((a,b)=> b.count - a.count || a.label.localeCompare(b.label));
     return rows;
   }
-
   function renderLegend(nodes, activeIds){
     const box = document.getElementById('legend');
     if (!box) return;
-
     const buckets = legendBuckets(nodes, activeIds);
     const shown = buckets.slice(0, LEGEND_MAX);
     const more = Math.max(0, buckets.length - shown.length);
-
-    const nodeLegendHTML = `
+    box.innerHTML = `
       <h3>${titleForMode()}</h3>
       ${shown.map(b=>`
         <div class="row">
@@ -252,19 +248,7 @@
         </div>`).join('')}
       ${more ? `<div class="more">+${more} more…</div>` : ''}
     `;
-
-    const edgeLegendHTML = `
-      <div class="sep"></div>
-      <h3>Edges</h3>
-      <div class="row"><span class="swatch" style="background:#fff"></span><span>Selected connection(s)</span></div>
-      <div class="row"><span class="swatch" style="background:rgba(200,200,200,.85)"></span><span>Similarity edge</span></div>
-      <div class="row"><span class="swatch" style="background:${MUTED_LINK}"></span><span class="muted">Muted (filtered-out)</span></div>
-    `;
-
-    box.innerHTML = nodeLegendHTML + edgeLegendHTML;
   }
-
-  /* ---- Legend show/hide controller ---- */
   function setLegendVisible(v){
     const box = document.getElementById('legend');
     const btn = document.getElementById('legendToggle');
@@ -277,12 +261,8 @@
   function getLegendInitialVisibility(){
     const saved = localStorage.getItem('legend:visible');
     if (saved !== null) return saved === 'true';
-    return false;  // default: hidden on first load
+    return false;  // default hidden
   }
-
-
-
-
   </script>
 </head>
 
@@ -290,17 +270,17 @@
 <div id="layout">
   <!-- Left -->
   <div id="left" class="panel">
-    <h2>3D PEOPLE NETWORK</h2>
+    <h2>EDGELANDS NETWORK</h2>
 
     <!-- ===== VIEW group ===== -->
     <section class="group" id="group-view">
       <div class="group-title">View</div>
       <div class="group-body">
 
-        <!-- Selection tools -->
-        <div class="box collapsible" id="box-selection">
+        <!-- Selection tools (hidden — we replace with floating pills) -->
+        <div class="box collapsible" id="box-selection" style="display:none">
           <div class="box-head">
-            <button class="box-toggle" id="toggle-selection" aria-expanded="true" aria-controls="selection-body">Selection tools</button>
+            <button class="box-toggle" id="toggle-selection" aria-expanded="false" aria-controls="selection-body">Selection tools</button>
           </div>
           <div class="box-body" id="selection-body">
             <div class="row">
@@ -310,10 +290,10 @@
           </div>
         </div>
 
-        <!-- Filters -->
+        <!-- Filters (collapsed by default) -->
         <div class="box collapsible" id="box-filters">
           <div class="box-head">
-            <button class="box-toggle" id="toggle-filters" aria-expanded="true" aria-controls="filters-body">Filters</button>
+            <button class="box-toggle" id="toggle-filters" aria-expanded="false" aria-controls="filters-body">Filters</button>
           </div>
           <div class="box-body" id="filters-body">
             <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
@@ -331,10 +311,10 @@
       <div class="group-title">Customization</div>
       <div class="group-body">
 
-        <!-- Coloring -->
+        <!-- Coloring (collapsed by default) -->
         <div class="box collapsible" id="box-coloring">
           <div class="box-head">
-            <button class="box-toggle" id="toggle-coloring" aria-expanded="true" aria-controls="coloring-body">Coloring</button>
+            <button class="box-toggle" id="toggle-coloring" aria-expanded="false" aria-controls="coloring-body">Coloring</button>
           </div>
           <div class="box-body" id="coloring-body">
             <label style="margin-top:0">Node color by</label>
@@ -345,20 +325,13 @@
               <option value="event">Event/Connection</option>
               <option value="none">None (single)</option>
             </select>
-
-            <label>Edge color by</label>
-            <select id="edgeColorBy">
-              <option value="by-rule" selected>By edge rule</option>
-              <option value="same-nodes">Same as nodes</option>
-              <option value="static">Static</option>
-            </select>
           </div>
         </div>
 
         <!-- Edge rule: SIMILARITY -->
         <div class="box collapsible" id="box-edge">
           <div class="box-head">
-            <button class="box-toggle" id="toggle-edge" aria-expanded="true" aria-controls="edge-body">Edge rule (advanced)</button>
+            <button class="box-toggle" id="toggle-edge" aria-expanded="false" aria-controls="edge-body">Edge rule (advanced)</button>
           </div>
           <div class="box-body" id="edge-body">
             <label>Mode</label>
@@ -389,8 +362,15 @@
   </div>
 
   <!-- Graph -->
-  <div id="graph" class="vis3d"><div id="3d"></div> <div id="legend" class="legend"></div><button id="legendToggle" class="legend-toggle" aria-expanded="false" aria-controls="legend">Legend</button></div>
+  <div id="graph" class="vis3d">
+    <div id="3d"></div>
+    <div id="legend" class="legend"></div>
+    <button id="legendToggle" class="pill" aria-expanded="false" aria-controls="legend">Legend</button>
 
+    <!-- Floating action pills -->
+    <button id="resetFloating" class="pill">Reset view</button>
+    <button id="clearSelFloating" class="pill">Clear selection</button>
+  </div>
 
   <!-- Right -->
   <div id="right" class="panel">
@@ -459,16 +439,13 @@
   const $th=document.getElementById('simThreshold');
   const $thLbl=document.getElementById('simThresholdLabel'); $thLbl.textContent = $th.value + '%';
   const $counts=document.getElementById('counts');
-  const $reset=document.getElementById('reset');
-  const $clearSel=document.getElementById('clearSel');
-  const $clearAllFilters=document.getElementById('clearAllFilters');
   const $tbody=document.querySelector('#tbl tbody');
   const $details=document.getElementById('details');
   const $filters=document.getElementById('filters');
   const $nodeColorBy=document.getElementById('nodeColorBy');
-  const $edgeColorBy=document.getElementById('edgeColorBy');
   const $legendToggle = document.getElementById('legendToggle');
-
+  const $resetFloating = document.getElementById('resetFloating');
+  const $clearSelFloating = document.getElementById('clearSelFloating');
 
   // --- Global search refs/state ---
   const $search = document.getElementById('globalSearch');
@@ -495,8 +472,8 @@
   $search?.addEventListener('input', debounce(e => { setSearchTerms(e.target.value); applyFilters(); }, 150));
   $clearSearch?.addEventListener('click', () => { $search.value=''; setSearchTerms(''); applyFilters(); });
 
-  // Collapsibles with persistence
-  function initCollapsible(boxId, storageKey, defaultOpen=true){
+  // Collapsibles with persistence (defaults updated)
+  function initCollapsible(boxId, storageKey, defaultOpen=false){
     const box=document.getElementById(boxId);
     const btn=box.querySelector('.box-toggle');
     const key='collapse:'+storageKey;
@@ -508,9 +485,8 @@
     btn.addEventListener('click', toggle);
     btn.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); }});
   }
-  initCollapsible('box-selection','selection', true);
-  initCollapsible('box-filters','filters', true);
-  initCollapsible('box-coloring','coloring', true);
+  initCollapsible('box-filters','filters', false);
+  initCollapsible('box-coloring','coloring', false);
   initCollapsible('box-edge','edge-v2', false);
 
   // Sorting
@@ -531,8 +507,8 @@
     .nodeId('id')
     .nodeLabel(n=>[n.label,[n.project,n.city].filter(Boolean).join(' — ')].filter(Boolean).join('\n'))
     .nodeRelSize(4)
-    .nodeOpacity(0.95)    // numeric constant
-    .linkOpacity(0.18)    // numeric constant
+    .nodeOpacity(0.95)
+    .linkOpacity(0.18)
     .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim()||'#0b0b0b')
     .onNodeClick(n=>toggleSelectById(n.id));
 
@@ -556,8 +532,6 @@
 
   // ===== State → colors & widths
   window.nodeColorMode = 'city';
-  window.edgeColorMode = 'by-rule';
-
 
   function recomputeNeighbors(){
     neighborIds.clear();
@@ -571,10 +545,7 @@
   }
 
   function nodeColor(n){
-    // Selection dominates → white
     if (selectedIds.has(n.id)) return COL_SELECTED;
-
-    // Active or neighbor → full palette
     if (activeIds.has(n.id) || neighborIds.has(n.id)){
       switch(nodeColorMode){
         case 'city': { const c=cityTokenColor(n.city); return c || getBrandColor(n.city,'fallback'); }
@@ -584,7 +555,6 @@
         default:         return COL_NODE_DEFAULT;
       }
     }
-    // Otherwise muted
     return MUTED_NODE;
   }
 
@@ -592,45 +562,31 @@
     const s = typeof l.source==='object' ? l.source : nodes.find(n=>n.id===l.source);
     const t = typeof l.target==='object' ? l.target : nodes.find(n=>n.id===l.target);
     const sId=s.id, tId=t.id;
-
-    // Selection adjacency → white
     if (selectedIds.has(sId) || selectedIds.has(tId)) return COL_SELECTED;
-
-    // Both endpoints active → rule color
     const bothActive = activeIds.has(sId) && activeIds.has(tId);
     if (bothActive){
-      switch(edgeColorMode){
-        case 'same-nodes': return nodeColor(s);
-        case 'by-rule':
-          if (l.kind==='sim')   return 'rgba(200,200,200,0.65)';
-          if (l.kind==='random')return 'rgba(150,150,150,0.45)';
-          return COL_LINK_DEFAULT;
-        default: return COL_LINK_DEFAULT;
-      }
+      if (l.kind==='sim')   return 'rgba(200,200,200,0.65)';
+      if (l.kind==='random')return 'rgba(150,150,150,0.45)';
+      return 'rgba(180,180,180,0.6)';
     }
     return MUTED_LINK;
   }
 
-function applyColors(){
-  world.nodeColor(nodeColor);
-  world.linkColor(edgeColor);
+  function applyColors(){
+    world.nodeColor(nodeColor);
+    world.linkColor(edgeColor);
+    world.linkWidth(l => {
+      const sId = typeof l.source==='object' ? l.source.id : l.source;
+      const tId = typeof l.target==='object' ? l.target.id : l.target;
+      if (selectedIds.has(sId) || selectedIds.has(tId)) return 3.6 + (l.score||0)*1.6;
+      if (activeIds.has(sId) && activeIds.has(tId) && l.kind==='sim') return 0.9 + (l.score||0)*0.8;
+      return 0.22;
+    });
+    world.linkOpacity(selectedIds.size ? 0.33 : 0.18);
+    world.nodeOpacity(0.95);
+  }
 
-  // Widths: selected incident edges thicker; active-by-sim moderate; others thin
-  world.linkWidth(l => {
-    const sId = typeof l.source==='object' ? l.source.id : l.source;
-    const tId = typeof l.target==='object' ? l.target.id : l.target;
-    if (selectedIds.has(sId) || selectedIds.has(tId)) return 3.6 + (l.score||0)*1.6;  
-    if (activeIds.has(sId) && activeIds.has(tId) && l.kind==='sim') return 0.9 + (l.score||0)*0.8;
-    return 0.22; 
-  });
-
-  // Slightly raise opacity ONLY when there is a selection
-  world.linkOpacity(selectedIds.size ? 0.33 : 0.18); 
-  world.nodeOpacity(0.95);
-}
-
-
-  // ===== Edge building
+  // ===== Edge building (unchanged)
   function getSimilaritySettings(){
     const fields=[];
     if (document.getElementById('simChk-language').checked)  fields.push('language');
@@ -641,7 +597,6 @@ function applyColors(){
     const threshold = (+$th.value)/100;
     return { fields, threshold };
   }
-
   function jaccard(aSet,bSet){
     if (!aSet.size && !bSet.size) return NaN;
     let inter=0;
@@ -650,7 +605,6 @@ function applyColors(){
     const union = new Set([...aSet, ...bSet]).size;
     return union ? inter/union : NaN;
   }
-
   function pairSimilarity(a,b,fields){
     const scores=[];
     for(const f of fields){
@@ -666,7 +620,6 @@ function applyColors(){
     if (!scores.length) return 0;
     return scores.reduce((x,y)=>x+y,0)/scores.length;
   }
-
   function rebuildLinks(mode){
     links=[];
     if (mode==='random'){
@@ -678,18 +631,15 @@ function applyColors(){
         if(!used.has(key)){used.add(key); links.push({source:s,target:t,kind:'random'})}
       }
       world.graphData({nodes,links});
-      applyFilters(); // recolor + recount
-      return;
-    }
-
-    // Similarity mode
-    const {fields, threshold} = getSimilaritySettings();
-    if (!fields.length){
-      world.graphData({nodes,links}); // empty
       applyFilters();
       return;
     }
-
+    const {fields, threshold} = getSimilaritySettings();
+    if (!fields.length){
+      world.graphData({nodes,links});
+      applyFilters();
+      return;
+    }
     for(let i=0;i<nodes.length;i++){
       for(let j=i+1;j<nodes.length;j++){
         const a=nodes[i], b=nodes[j];
@@ -703,7 +653,7 @@ function applyColors(){
     applyFilters();
   }
 
-  // ===== Right cards, counts, filters
+  // ===== Right cards, counts, filters =====
   function renderSelectedCards(){
     if(selectedIds.size===0){ $details.innerHTML='<div class="muted">Click a node or table row to see details here.</div>'; return; }
     const sel=[...selectedIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean).sort((a,b)=>(a.last||'').localeCompare(b.last||''));
@@ -755,20 +705,38 @@ function applyColors(){
     return [...values].sort((a,b)=>a.localeCompare(b));
   }
 
+  // Facets builder: each facet collapsible & collapsed by default (remembers state)
   function makeFacet(def){
     const values=uniqueSortedValues(def);
     const wrap=document.createElement('div'); wrap.className='facet'; wrap.dataset.key=def.key;
-    const title=document.createElement('div'); title.className='facet-title'; title.innerHTML=`<span>${def.title}</span>`;
-    const actions=document.createElement('div'); actions.className='facet-actions';
+
+    // header
+    const header=document.createElement('div'); header.className='facet-header';
+    const title=document.createElement('div'); title.className='title'; title.textContent=def.title;
+    const actions=document.createElement('div'); actions.className='actions';
     const aAll=document.createElement('button'); aAll.type='button'; aAll.textContent='Select all';
     const aClr=document.createElement('button'); aClr.type='button'; aClr.textContent='Clear';
-    actions.append(aAll,aClr); title.append(actions);
+    actions.append(aAll,aClr); header.append(title, actions);
 
+    // body
+    const body=document.createElement('div'); body.className='facet-body';
     const list=document.createElement('div'); list.className='facet-list';
     values.forEach(v=>{const id=`chk-${def.key}-${v.replace(/[^a-z0-9]+/gi,'').toLowerCase()}`; const row=document.createElement('label'); row.className='facet-item'; row.title=v; row.innerHTML=`<input type="checkbox" value="${v}" id="${id}"><span>${v}</span>`; list.appendChild(row)});
+    body.appendChild(list);
 
-    wrap.append(title,list); $filters.appendChild(wrap);
+    wrap.append(header, body); $filters.appendChild(wrap);
 
+    // collapse logic with storage
+    const key='facet:'+def.key;
+    let open = localStorage.getItem(key);
+    open = open==null ? false : (open==='true');
+    wrap.classList.toggle('is-collapsed', !open);
+    header.addEventListener('click', (e)=>{
+      if (e.target===aAll || e.target===aClr) return;
+      open=!open; wrap.classList.toggle('is-collapsed', !open); localStorage.setItem(key, String(open));
+    });
+
+    // actions + change handlers
     list.addEventListener('change',e=>{ if(e.target && e.target.type==='checkbox'){const val=e.target.value; if(e.target.checked) selectedFacets[def.key].add(val); else selectedFacets[def.key].delete(val); applyFilters()}});
     aAll.onclick=()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(cb=>{cb.checked=true; selectedFacets[def.key].add(cb.value)}); applyFilters() };
     aClr.onclick=()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); selectedFacets[def.key].clear(); applyFilters() };
@@ -789,19 +757,16 @@ function applyColors(){
     nodes.forEach(n => { if (rowPassesFacets(n) && rowMatchesSearch(n)) activeIds.add(n.id); });
     recomputeNeighbors();
 
-    renderTable();     // list only active rows
-    updateCounts();    // counts for active subset
-    applyColors();     // recolor graph under current state
+    renderTable();
+    updateCounts();
+    applyColors();
     renderLegend(nodes, activeIds);
-
   }
 
   // ===== Table =====
   let currentTableOrder = nodes.map(n => n.id);
   function renderTable(){
-    // data subset
     const rowsActive = nodes.filter(n => activeIds.has(n.id));
-    // sort
     rowsActive.sort((a,b)=>{
       const av=(a[sortCol]||'').toString().toLowerCase();
       const bv=(b[sortCol]||'').toString().toLowerCase();
@@ -809,7 +774,6 @@ function applyColors(){
     });
     currentTableOrder = rowsActive.map(n=>n.id);
 
-    // render
     const tr = rowsActive.map(n => `
       <tr data-id="${n.id}" class="${selectedIds.has(n.id)?'selected':''}">
         <td>${n.last||''}</td>
@@ -824,7 +788,6 @@ function applyColors(){
       </tr>`).join('');
     $tbody.innerHTML = tr || `<tr><td colspan="9" class="muted">No rows</td></tr>`;
 
-    // row handlers (click/shift/cmd multi-select)
     const rowsEls = Array.from($tbody.querySelectorAll('tr'));
     rowsEls.forEach((rowEl, idx) => {
       rowEl.onclick = (ev) => {
@@ -844,7 +807,7 @@ function applyColors(){
           lastClickedIndex = idx;
         }
         renderSelectedCards();
-        applyFilters();   // recolor under new selection
+        applyFilters();
       };
     });
   }
@@ -857,15 +820,13 @@ function applyColors(){
 
   // UI wiring
   document.querySelectorAll('#tbl thead th').forEach(th=>{ th.onclick=()=>{ const c=th.dataset.col; sortAsc=(sortCol===c)?!sortAsc:true; sortCol=c; renderTable() }});
-  document.getElementById('nodeColorBy').onchange=()=>{window.nodeColorMode = $nodeColorBy.value;applyColors();renderLegend(nodes, activeIds);};
-
-  // document.getElementById('edgeColorBy').onchange=()=>{ edgeColorMode=$edgeColorBy.value; applyColors(); };
+  document.getElementById('nodeColorBy').onchange=()=>{ window.nodeColorMode = $nodeColorBy.value; applyColors(); renderLegend(nodes, activeIds); };
 
   $edgeMode.onchange=()=>{
     const sim = $edgeMode.value==='similarity';
     $simOptions.style.display = sim ? 'block' : 'none';
     rebuildLinks($edgeMode.value);
-    setLegendVisible(false);  // hide on first load to avoid interference
+    setLegendVisible(false);
     setLegendVisible(getLegendInitialVisibility());
   };
   $th.oninput=()=>{ $thLbl.textContent = $th.value + '%'; rebuildLinks($edgeMode.value); };
@@ -873,15 +834,20 @@ function applyColors(){
     document.getElementById('simChk-'+k).onchange=()=>rebuildLinks($edgeMode.value);
   });
 
-  $reset.onclick=()=>{ frameToBounds(4.2); selectedIds.clear(); lastClickedIndex=null;
+  // Floating action pills
+  function doReset(){
+    frameToBounds(4.2); selectedIds.clear(); lastClickedIndex=null;
     for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) }
     setSearchTerms(''); const s=document.getElementById('globalSearch'); if (s) s.value='';
     renderSelectedCards(); rebuildLinks($edgeMode.value); renderLegend(nodes, activeIds);
-  };
-  $clearSel.onclick=()=>{ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters() };
-  $clearAllFilters.onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } applyFilters() };
-  $legendToggle.onclick = () => {const expanded = $legendToggle.getAttribute('aria-expanded') === 'true'; setLegendVisible(!expanded);};
-  // Keyboard shortcut: press "L" to toggle
+  }
+  function doClearSel(){ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters(); }
+
+  $resetFloating.onclick = doReset;
+  $clearSelFloating.onclick = doClearSel;
+
+  // Legend pill + keyboard
+  $legendToggle.onclick = () => { const expanded = $legendToggle.getAttribute('aria-expanded') === 'true'; setLegendVisible(!expanded); };
   document.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() === 'l' && !e.metaKey && !e.ctrlKey && !e.altKey){
       e.preventDefault();
@@ -890,14 +856,12 @@ function applyColors(){
     }
   });
 
-
   // Init
   buildFacets();
   renderTable();
   renderSelectedCards();
-
   rebuildLinks($edgeMode.value);
-  setLegendVisible(false);
+  setLegendVisible(false);  // hide legend on first load
 })();
 </script>
 </body>
