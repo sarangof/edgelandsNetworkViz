@@ -133,7 +133,7 @@
   <script src="https://unpkg.com/3d-force-graph"></script>
   <script>
   const CSV_DEFAULT_PATH='database_Sep10.csv';
-  const HEADER_MAP={"event/ connection":"event","last name":"last","first name":"first","email":"email","edgelands project":"project","language":"language","edgelands experience":"experience","expertise":"expertise","city":"city"};
+  const HEADER_MAP={"event/ connection":"event","connection": "event","last name":"last","first name":"first","email":"email","edgelands project":"project","language":"language","edgelands experience":"experience","expertise":"expertise","city":"city"};
   const TOKEN_SPLIT=/[,;/|·]+/;
   const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+|\/+/g,' ');
 
@@ -182,73 +182,203 @@
   const MUTED_LINK   = '#141414';
 
   const BRAND_PALETTE = ['#335852','#70AF94','#D85751','#E2F16C','#473B36','#BCCFC8'];
-  const colorMap = { project:new Map(), language:new Map(), event:new Map(), fallback:new Map() };
+  const colorMap = {project: new Map(), language: new Map(), event: new Map(), experience:new Map(), expertise: new Map(),
+  fallback:  new Map()
+};
+
   function getBrandColor(value, domain='fallback'){
     const key=(value||'').toLowerCase(); if(!key) return BRAND_PALETTE[0];
     const cmap=colorMap[domain]||colorMap.fallback;
     if(cmap.has(key)) return cmap.get(key);
     const col=BRAND_PALETTE[cmap.size % BRAND_PALETTE.length]; cmap.set(key,col); return col;
   }
+
   function cityTokenColor(city){
     const v=css.getPropertyValue(`--city-${(city||'').toLowerCase().replace(/\s+/g,'')}`).trim();
     return v || null;
   }
   function firstToken(v){ return (v||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)[0] || '' }
 
+  function primaryKeyForMode(n, mode){
+  switch (mode){
+    case 'city':       return (n.city||'').trim();
+    case 'event':      return (n.event||'').trim();
+    case 'project':    return firstToken(n.project);
+    case 'language':   return firstToken(n.language);
+    case 'experience': return firstToken(n.experience);
+    case 'expertise':  return firstToken(n.expertise);
+    default:           return '';
+    }
+  }
+
+
   /* ---- Legend helpers ----*/
-  const LEGEND_MAX = 12;
+
   function colorForNodeKeyByMode(key){
     switch (nodeColorMode){
-      case 'city':    return cityTokenColor(key) || getBrandColor(key,'fallback');
-      case 'project': return getBrandColor(firstToken(key),'project');
-      case 'language':return getBrandColor(firstToken(key),'language');
-      case 'event':   return getBrandColor(key,'event');
-      default:        return COL_NODE_DEFAULT;
+        case 'city':       return cityTokenColor(key) || getBrandColor(key, 'fallback');
+        case 'project':    return getBrandColor(firstToken(key), 'project');
+        case 'language':   return getBrandColor(firstToken(key), 'language');
+        case 'event':      return getBrandColor(key, 'event');
+        case 'experience': return getBrandColor(firstToken(key), 'experience');
+        case 'expertise':  return getBrandColor(firstToken(key), 'expertise');
+        default:           return COL_NODE_DEFAULT;
+      }
     }
-  }
+
+
+
   function titleForMode(){
     switch (nodeColorMode){
-      case 'city': return 'Nodes colored by: City';
-      case 'project': return 'Nodes colored by: Edgelands Project';
-      case 'language': return 'Nodes colored by: Language';
-      case 'event': return 'Nodes colored by: Event/Connection';
-      default: return 'Nodes colored by: None';
+      case 'city':       return 'Nodes colored by: City';
+      case 'project':    return 'Nodes colored by: Edgelands Project';
+      case 'language':   return 'Nodes colored by: Language';
+      case 'event':      return 'Nodes colored by: Connection';
+      case 'experience': return 'Nodes colored by: Edgelands Experience';
+      case 'expertise':  return 'Nodes colored by: Expertise';
+      default:           return 'Nodes colored by: None';
     }
   }
-  function legendBuckets(nodes, activeIds){
-    const counts = new Map();
-    for (const n of nodes){
-      if (!activeIds.has(n.id)) continue;
-      let keys = [];
-      if (nodeColorMode === 'city')       keys = [(n.city||'').trim()].filter(Boolean);
-      else if (nodeColorMode === 'event') keys = [(n.event||'').trim()].filter(Boolean);
-      else if (nodeColorMode === 'project')  keys = (n.project||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean);
-      else if (nodeColorMode === 'language') keys = (n.language||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean);
-      keys.forEach(k => counts.set(k, (counts.get(k)||0)+1));
+
+  function facetKeyForColorMode(mode){
+    switch (mode){
+      case 'city':       return 'city';       // non-tokenized
+      case 'project':    return 'project';    // tokenized
+      case 'language':   return 'language';   // tokenized
+      case 'event':      return 'event';      // non-tokenized (your “Connection”)
+      case 'experience': return 'experience'; // tokenized
+      case 'expertise':  return 'expertise';  // tokenized
+      default:           return null;
     }
-    const rows = [...counts.entries()].map(([key,count]) => ({
-      key, label: key || '(empty)', count, color: colorForNodeKeyByMode(key||'')
+  }
+
+
+  const LEGEND_MAX = 5;  // Max number of legend rows to show before collapsing into “+N more…”
+
+
+  function legendBuckets(nodes, activeIds){
+    const all = new Map(), vis = new Map();
+    for (const n of nodes){
+      const key = primaryKeyForMode(n, nodeColorMode);
+      if (!key) continue;
+      all.set(key, (all.get(key)||0) + 1);
+      if (activeIds.has(n.id)) vis.set(key, (vis.get(key)||0) + 1);
+    }
+    const rows = [...all.entries()].map(([key,countAll]) => ({
+      key,
+      label: key,
+      countAll,
+      countVis: vis.get(key) || 0,
+      color: colorForNodeKeyByMode(key)
     }));
-    rows.sort((a,b)=> b.count - a.count || a.label.localeCompare(b.label));
+    rows.sort((a,b)=> b.countAll - a.countAll || a.label.localeCompare(b.label));
     return rows;
   }
+
+
+  // Return a Set of currently-checked values for a facet, by reading the DOM.
+  function currentFacetSelection(facetKey){
+    const wrap = document.querySelector(`.facet[data-key="${facetKey}"]`);
+    const sel = new Set();
+    if (!wrap) return sel;
+    wrap.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => sel.add(cb.value));
+    return sel;
+  }
+
+  // For legend rendering: is a legend row "checked" right now?
+  function legendRowIsChecked(facetKey, valueOrValues){
+    const sel = currentFacetSelection(facetKey);
+    if (Array.isArray(valueOrValues)){
+      // For the "Other" bucket: consider checked only if ALL its members are selected
+      return valueOrValues.every(v => sel.has(v));
+    }
+    return sel.has(valueOrValues);
+  }
+
+  function setFacetValuesChecked(facetKey, values, checked){
+    const wrap = document.querySelector(`.facet[data-key="${facetKey}"]`);
+    if (!wrap) return;
+    const valueSet = new Set(values);
+
+    // Toggle only the affected boxes, then dispatch a *bubbling* change so the
+    // facet's delegated listener catches it and calls applyFilters().
+    wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      if (!valueSet.has(cb.value)) return;
+      const willChange = cb.checked !== !!checked;
+      cb.checked = !!checked;
+      if (willChange) cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+
+
+
   function renderLegend(nodes, activeIds){
     const box = document.getElementById('legend');
     if (!box) return;
+
+    const facetKey = facetKeyForColorMode(nodeColorMode);
     const buckets = legendBuckets(nodes, activeIds);
-    const shown = buckets.slice(0, LEGEND_MAX);
-    const more = Math.max(0, buckets.length - shown.length);
+
+    // If truncated, show top (LEGEND_MAX-1) then an interactive “Other”
+    const room = Math.max(0, LEGEND_MAX);
+    const showCount = Math.max(0, room - 1);
+    const showRows = buckets.slice(0, showCount);
+    const otherRows = buckets.slice(showCount); // may be empty
+
+    // Build HTML
+    const rowsHTML = showRows.map(b => {
+      const checked = legendRowIsChecked(facetKey, b.key);
+      return `
+            <div class="row legend-item" data-key="${b.key}" style="cursor:pointer;">
+              <span class="swatch" style="background:${b.color}"></span>
+              <span>${b.label}</span>
+              <span class="meta">${b.countVis}/${b.countAll}</span>
+            </div>
+            `;
+    }).join('');
+
+    const otherCount = otherRows.reduce((s, r) => s + r.count, 0);
+    const otherKeys = otherRows.map(r => r.key);
+
+    const otherHTML = otherRows.length ? (() => {
+      const checked = legendRowIsChecked(facetKey, otherKeys);
+      // “Other” uses a neutral swatch
+      return `
+        <div class="row legend-item" data-other="1" data-keys='${JSON.stringify(otherKeys)}' style="cursor:pointer;">
+          <span class="swatch" style="background:rgba(150,150,150,.6)"></span>
+          <span>Other</span>
+          <span class="meta">${otherCount}</span>
+        </div>
+        `;
+    })() : '';
+
     box.innerHTML = `
       <h3>${titleForMode()}</h3>
-      ${shown.map(b=>`
-        <div class="row">
-          <span class="swatch" style="background:${b.color}"></span>
-          <span>${b.label}</span>
-          <span class="meta">${b.count}</span>
-        </div>`).join('')}
-      ${more ? `<div class="more">+${more} more…</div>` : ''}
+      ${rowsHTML}
+      ${otherHTML}
     `;
+
+    // Wire interactivity → toggle facet selections
+    box.querySelectorAll('.legend-item').forEach(row => {
+      row.addEventListener('click', (e) => {
+        // allow clicking the whole row (not only the checkbox)
+        const isOther = row.hasAttribute('data-other');
+        const values = isOther
+          ? JSON.parse(row.getAttribute('data-keys') || '[]')
+          : [row.getAttribute('data-key')];
+
+        const facet = facetKeyForColorMode(nodeColorMode);
+        if (!facet || values.length === 0) return;
+
+        // Toggle: if ALL values are selected → unselect all; else select all
+        const currentlyChecked = legendRowIsChecked(facet, values);
+        setFacetValuesChecked(facet, values, !currentlyChecked);
+      });
+    });
   }
+
+    
+
   function setLegendVisible(v){
     const box = document.getElementById('legend');
     const btn = document.getElementById('legendToggle');
@@ -318,13 +448,15 @@
           </div>
           <div class="box-body" id="coloring-body">
             <label style="margin-top:0">Node color by</label>
-            <select id="nodeColorBy">
-              <option value="city" selected>City</option>
-              <option value="project">Edgelands Project</option>
-              <option value="language">Language</option>
-              <option value="event">Event/Connection</option>
-              <option value="none">None (single)</option>
-            </select>
+              <select id="nodeColorBy">
+                <option value="city" selected>City</option>
+                <option value="project">Edgelands Project</option>
+                <option value="language">Language</option>
+                <option value="event">Connection</option>
+                <option value="experience">Edgelands Experience</option>
+                <option value="expertise">Expertise</option>
+                <option value="none">None (single)</option>
+              </select>
           </div>
         </div>
 
@@ -400,7 +532,7 @@
           <th data-col="first">FIRST NAME ▲▼</th>
           <th data-col="email">EMAIL ▲▼</th>
           <th data-col="city">CITY ▲▼</th>
-          <th data-col="event">EVENT/CONNECTION ▲▼</th>
+          <th data-col="event">CONNECTION ▲▼</th>
           <th data-col="project">EDGELANDS PROJECT ▲▼</th>
           <th data-col="language">LANGUAGE ▲▼</th>
           <th data-col="experience">EXPERIENCE ▲▼</th>
@@ -547,16 +679,20 @@
   function nodeColor(n){
     if (selectedIds.has(n.id)) return COL_SELECTED;
     if (activeIds.has(n.id) || neighborIds.has(n.id)){
+      const key = primaryKeyForMode(n, nodeColorMode);
       switch(nodeColorMode){
-        case 'city': { const c=cityTokenColor(n.city); return c || getBrandColor(n.city,'fallback'); }
-        case 'project':  return getBrandColor(firstToken(n.project), 'project');
-        case 'language': return getBrandColor(firstToken(n.language), 'language');
-        case 'event':    return getBrandColor(n.event, 'event');
-        default:         return COL_NODE_DEFAULT;
+        case 'city':       { const c = cityTokenColor(key); return c || getBrandColor(key, 'fallback'); }
+        case 'project':    return getBrandColor(key, 'project');
+        case 'language':   return getBrandColor(key, 'language');
+        case 'event':      return getBrandColor(key, 'event');
+        case 'experience': return getBrandColor(key, 'experience');
+        case 'expertise':  return getBrandColor(key, 'expertise');
+        default:           return COL_NODE_DEFAULT;
       }
     }
     return MUTED_NODE;
   }
+
 
   function edgeColor(l){
     const s = typeof l.source==='object' ? l.source : nodes.find(n=>n.id===l.source);
@@ -686,7 +822,7 @@
   }
 
   const facetDefs=[
-    {title:'Event/Connection', key:'event', tokenized:false},
+    {title:'Connection', key:'event', tokenized:false},
     {title:'Edgelands Project', key:'project', tokenized:true},
     {title:'Language', key:'language', tokenized:true},
     {title:'Edgelands Experience', key:'experience', tokenized:true},
@@ -820,7 +956,8 @@
 
   // UI wiring
   document.querySelectorAll('#tbl thead th').forEach(th=>{ th.onclick=()=>{ const c=th.dataset.col; sortAsc=(sortCol===c)?!sortAsc:true; sortCol=c; renderTable() }});
-  document.getElementById('nodeColorBy').onchange=()=>{ window.nodeColorMode = $nodeColorBy.value; applyColors(); renderLegend(nodes, activeIds); };
+  document.getElementById('nodeColorBy').onchange=()=>{ window.nodeColorMode = $nodeColorBy.value; applyColors(); renderLegend(nodes, activeIds); setLegendVisible(true);
+};
 
   $edgeMode.onchange=()=>{
     const sim = $edgeMode.value==='similarity';
