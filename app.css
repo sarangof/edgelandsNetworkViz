@@ -1,0 +1,144 @@
+
+<style>
+html, body { height:100%; margin:0; font-family: var(--font-sans, system-ui,-apple-system,Segoe UI,Roboto,sans-serif) }
+#layout{
+    display:grid;
+    grid-template-columns:320px 1fr 340px;
+    grid-template-rows: 60% 40%;
+    grid-template-areas:
+    "left graph right"
+    "bottom bottom bottom";
+    gap:16px; height:100%;
+    padding:12px; box-sizing:border-box;
+    background: var(--app-bg, #0b0b0b);
+}
+.panel{ border:1px solid var(--app-border, rgba(255,255,255,.08)); border-radius:14px; background: var(--app-surface,#111); box-shadow:0 2px 12px rgba(0,0,0,.3); color: var(--app-text,#e5e5e5) }
+#left{ grid-area:left; padding:12px; overflow:auto }
+#right{ grid-area:right; padding:12px; overflow:auto }
+#graph.vis3d{ grid-area:graph; position:relative; background: var(--graph-background,#0b0b0b); border:1px solid var(--app-border); border-radius:14px; height:100%; min-height:0; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.3) }
+/* only the 3D host fills the panel */
+#graph > #3d { position:absolute; inset:0 }
+
+#bottom{ grid-area:bottom; padding:12px; overflow:auto; height:32vh; max-height:100vh; position:relative; z-index:2 }
+#counts{ font-size:13px; color: var(--col-muted,#9aa0a6); margin:0 0 6px 0 }
+
+h2{margin:0 0 10px; font-size:16px; font-weight:700; font-family: var(--font-display,var(--font-sans)) }
+label{display:block; margin-top:10px; font-weight:600}
+select, input[type="range"]{ width:100% }
+select{ padding:8px 10px; border-radius:10px; border:1px solid var(--app-border); background:#121212; color: var(--app-text,#e5e5e5) }
+button{ padding:8px 12px; border-radius:999px; border:1px solid var(--brand-accent,#DAF300); background:transparent; color: var(--brand-accent,#DAF300); cursor:pointer }
+.row{display:flex; gap:8px; margin-top:10px; align-items:center}
+.muted{color: var(--col-muted,#9aa0a6); font-size:12px}
+
+/* Group frames */
+.group{ border:1px solid var(--app-border); border-radius:14px; background:#121212; margin-bottom:14px; overflow:hidden }
+.group-title{ padding:10px 12px; font-weight:900; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color: var(--col-muted,#9aa0a6); border-bottom:1px solid var(--app-border); background:rgba(255,255,255,.03) }
+.group-body{ padding:8px 10px }
+
+/* Inner boxed sections (collapsible) */
+.box{ border:1px solid var(--app-border); border-radius:12px; background:#101010; margin:10px 0 }
+.box-head{ padding:10px }
+.box-body{ padding:10px; border-top:1px solid var(--app-border) }
+.box-toggle{ all:unset; display:flex; align-items:center; justify-content:space-between; width:100%; cursor:pointer; font-weight:800; font-size:13px; letter-spacing:.02em }
+.box-toggle::after{ content:"▾"; opacity:.85; transition:transform .18s ease }
+.box.is-closed .box-toggle::after{ transform:rotate(-90deg) }
+.box.is-closed .box-body{ display:none }
+
+/* Facets (now individually collapsible) */
+.facet{ margin-top:12px; border:1px solid var(--app-border); border-radius:12px; background:#121212; }
+.facet-header{ display:flex; align-items:center; justify-content:space-between; padding:10px; cursor:pointer }
+.facet-header .title{ font-size:13px; font-weight:700 }
+.facet-header .actions{ display:flex; gap:6px }
+.facet-body{ padding:10px; border-top:1px solid var(--app-border) }
+.facet-list{ max-height:160px; overflow:auto; padding-right:4px; display:grid; grid-template-columns:1fr; gap:6px }
+.facet-item{ display:flex; align-items:center; gap:8px; font-size:13px }
+.facet.is-collapsed .facet-body{ display:none }
+.facet.is-collapsed .facet-header::after{ content:"▸"; margin-left:8px; opacity:.8 }
+.facet:not(.is-collapsed) .facet-header::after{ content:"▾"; margin-left:8px; opacity:.8 }
+
+/* Right cards */
+.cards{display:grid; gap:10px; margin-top:8px}
+.person-card{border:1px solid var(--app-border); border-radius:12px; padding:10px; background:#121212; box-shadow:0 1px 6px rgba(0,0,0,.25); cursor:pointer}
+.person-card:hover{ box-shadow:0 2px 10px rgba(0,0,0,.35) }
+.pc-name{ font-weight:700; margin:0 0 4px; font-family: var(--font-display,var(--font-sans)) }
+.pc-email{ color:#8ab4f8; text-decoration:none; word-break:break-all }
+.pc-row{ font-size:12px; color:#e5e5e5; margin-top:2px }
+.pc-tags{ font-size:12px; color:#9aa0a6; margin-top:6px }
+
+/* Table */
+#bottom .frame-title{ margin:6px 0 6px; font-size:14px; font-weight:700; font-family: var(--font-display,var(--font-sans)) }
+table.table{ width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; background: var(--app-surface,#111); border:1px solid var(--app-border); border-radius:12px; overflow:hidden }
+table.table th, table.table td{ border-top:1px solid var(--app-border); padding:6px 8px; text-align:left }
+table.table thead th{ background: rgba(255,255,255,.06); position:sticky; top:0; cursor:pointer; user-select:none; text-transform:uppercase; letter-spacing:.06em; font-family: var(--font-display,var(--font-sans)) }
+tr.selected{ background: rgba(217,255,75,.12) }
+
+/* Legend overlay — small, bottom-right, scrollable */
+.legend{
+    position:absolute;
+    bottom:10px; right:10px; top:auto; left:auto;
+    width:260px;
+    max-height:calc(50% - 20px);
+    overflow-y:auto;
+    background:rgba(10,10,10,.85);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:12px;
+    padding:8px 10px;
+    font-size:12px; color:#e8e8e8;
+    backdrop-filter: blur(4px);
+    z-index:3;
+}
+.legend h3{ margin:0 0 6px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#9aa0a6 }
+.legend .row{ display:flex; align-items:center; gap:8px; margin:3px 0 }
+.legend .swatch{ width:12px; height:12px; border-radius:50%; border:1px solid rgba(255,255,255,.25); flex:0 0 auto; box-shadow:0 0 0 0.5px rgba(0,0,0,.5) }
+.legend .meta{ margin-left:auto; color:#9aa0a6 }
+.legend .more{ color:#9aa0a6; font-style:italic }
+.legend.is-hidden{ opacity:0; pointer-events:none; transform:translateY(6px); transition:.16s ease }
+.legend.is-shown + #legendToggle{ display:none; }
+.legend-head{ display:flex; align-items:center; gap:8px; }
+.legend-head h3{ margin:0; flex:1; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#9aa0a6 }
+.legend-close{
+    all:unset; cursor:pointer; padding:2px 6px; border-radius:8px;
+    border:1px solid rgba(214,255,79,.6); color:#D6FF4F; font-weight:700; font-size:12px;
+}
+
+
+/* Toggle pills */
+.pill{
+    position:absolute; bottom:10px; right:10px;
+    padding:6px 10px; border-radius:999px;
+    border:1px solid rgba(214,255,79,.9);
+    background:rgba(12,12,12,.6);
+    color:#D6FF4F; font-weight:700; font-size:12px; cursor:pointer;
+    backdrop-filter: blur(4px);
+    z-index:4;
+}
+.pill:focus{ outline:2px solid #D6FF4F; outline-offset:2px }
+/* when legend is open, move the pill left of the legend */
+.legend.is-shown + #legendToggle{
+    right: calc(260px + 16px);  /* legend width + gap */
+    transform: none;
+}
+
+
+/* Floating action pills (bottom-left) */
+#resetFloating{ left:10px; right:auto }
+#clearSelFloating{ left:120px; right:auto }
+#clearFiltersFloating{ left:230px; right:auto }   /* ← add */
+
+
+/* Responsive: widen legend slightly on narrow screens */
+@media (max-width: 640px){
+    .legend{ width:auto; left:10px; right:10px; max-height:40% }
+    #resetFloating{ left:10px }
+    #clearSelFloating{ left:110px }
+    #clearFiltersFloating{ left:210px } 
+}
+
+.navinfo{
+    position:absolute; top:10px; left:50%; transform:translateX(-50%);
+    padding:6px 10px; border-radius:10px;
+    background:rgba(10,10,10,.75); border:1px solid rgba(255,255,255,.08);
+    color:#cfcfcf; font-size:11px; letter-spacing:.02em;
+    pointer-events:none; z-index:4;
+}
+</style>
