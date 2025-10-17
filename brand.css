@@ -21,8 +21,8 @@
 /* ---- Root tokens ---- */
 :root{
   /* Core brand */
-  --col-primary: #00B08B;        /* RGB use */
-  --col-primary-cmyk: #00A680;   /* Alternativa CMYK */
+  --col-primary: #00B08B;        
+  --col-primary-cmyk: #00A680;   
   --col-primary-300:#73D0B3;
   --col-primary-900:#005B52;
   --col-accent-lime:#DAF300;
@@ -37,7 +37,7 @@
   --city-singapore:#FFC217;
 
   /* Neutrals */
-  --col-bg:#0b0b0b;        /* para modo intenso/casual */
+  --col-bg:#0b0b0b;        
   --col-bg-soft:#111; 
   --col-surface:#ffffff;
   --col-text:#111111;
