@@ -1,0 +1,970 @@
+  <!doctype html>
+  <html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>EDGELANDS PEOPLE NETWORK</title>
+
+    <!-- Brand + fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Georama:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="brand.css">
+    <link rel="stylesheet" href="app.css">
+
+    <script src="https://unpkg.com/3d-force-graph"></script>
+    <script>
+    const CSV_DEFAULT_PATH='database_Sep10.csv';
+    const HEADER_MAP={"event/ connection":"event","connection": "event","last name":"last","first name":"first","email":"email","edgelands project":"project","language":"language","edgelands experience":"experience","expertise":"expertise","city":"city"};
+    const TOKEN_SPLIT=/[,;/|·]+/;
+    const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+|\/+/g,' ');
+
+    // Avoid fetch noise when opened via file://
+    const IS_FILE_PROTOCOL = location.protocol === 'file:';
+
+    function detectDelimiter(t){const f=t.split(/\r?\n/).find(l=>l.trim())||"";return ((f.match(/;/g)||[]).length>(f.match(/,/g)||[]).length)?';':','}
+    function splitCSVLine(line,d){const o=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(q){if(ch==='"'){if(line[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}else{if(ch==='"')q=true;else if(ch===d){o.push(c);c=''}else c+=ch}}o.push(c);return o}
+    function parseCSV(text){
+      const d=detectDelimiter(text), lines=text.split(/\r?\n/).filter(l=>l.trim()); if(!lines.length) return [];
+      const header=splitCSVLine(lines[0],d).map(h=>norm(h)), keyFor=header.map(h=>HEADER_MAP[h]||h.replace(/\s+/g,'_'));
+      const rows=[]; for(let i=1;i<lines.length;i++){const cells=splitCSVLine(lines[i],d), obj={}; for(let c=0;c<header.length;c++){obj[keyFor[c]]=(cells[c]??'').trim()}
+        obj.first=obj.first||''; obj.last=obj.last||''; obj.email=obj.email||''; obj.project=obj.project||''; obj.language=obj.language||''; obj.experience=obj.experience||''; obj.expertise=obj.expertise||''; obj.city=obj.city||''; obj.event=obj.event||''; obj.label=[obj.first,obj.last].filter(Boolean).join(' ').trim()||'(unnamed)'; obj.org=obj.project; rows.push(obj)}
+      return rows
+    }
+    async function tryFetchCSV(p){
+      if (IS_FILE_PROTOCOL) return null;
+      try{
+        const r=await fetch(p,{cache:'no-cache'}); if(!r.ok) throw 0;
+        const t=await r.text(); const rows=parseCSV(t); if(!rows.length) throw 0; return rows;
+      }catch{ return null }
+    }
+    function askUserForCSV(){
+      return new Promise(res=>{
+        const b=document.createElement('div');
+        b.className='box';
+        b.innerHTML='<div class="box-head"><button class="box-toggle" aria-expanded="true">Load CSV</button></div><div class="box-body"><div class="muted">Choose a CSV to load your data:</div></div>';
+        const input=document.createElement('input'); input.type='file'; input.accept='.csv'; input.style.marginTop='8px';
+        input.onchange=e=>{const f=e.target.files[0]; if(!f) return; const rdr=new FileReader(); rdr.onload=()=>{b.remove(); res(parseCSV(rdr.result))}; rdr.readAsText(f)};
+        b.querySelector('.box-body').appendChild(input);
+        (document.getElementById('left')||document.body).prepend(b);
+      })
+    }
+    async function loadRows(){
+      const a=await tryFetchCSV(CSV_DEFAULT_PATH); if(a&&a.length) return a;
+      return await askUserForCSV();
+    }
+
+    // Brand tokens & palette
+    const css=getComputedStyle(document.documentElement);
+    const COL_NODE_DEFAULT = css.getPropertyValue('--graph-node').trim()||'#00B08B';
+
+    // Selection & muting colors (white reserved for selection)
+    const COL_SELECTED = '#FFFFFF';
+    const MUTED_NODE   = '#2a2a2a';
+    const MUTED_LINK   = '#141414';
+
+    const BRAND_PALETTE = ['#335852','#70AF94','#D85751','#E2F16C','#473B36','#BCCFC8'];
+    const colorMap = {project: new Map(), language: new Map(), event: new Map(), experience:new Map(), expertise: new Map(),
+    fallback:  new Map()
+  };
+
+    function getBrandColor(value, domain='fallback'){
+      const key=(value||'').toLowerCase(); if(!key) return BRAND_PALETTE[0];
+      const cmap=colorMap[domain]||colorMap.fallback;
+      if(cmap.has(key)) return cmap.get(key);
+      const col=BRAND_PALETTE[cmap.size % BRAND_PALETTE.length]; cmap.set(key,col); return col;
+    }
+
+    function cityTokenColor(city){
+      const v=css.getPropertyValue(`--city-${(city||'').toLowerCase().replace(/\s+/g,'')}`).trim();
+      return v || null;
+    }
+    function firstToken(v){ return (v||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)[0] || '' }
+
+    function primaryKeyForMode(n, mode){
+    switch (mode){
+      case 'city':       return (n.city||'').trim();
+      case 'event':      return (n.event||'').trim();
+      case 'project':    return firstToken(n.project);
+      case 'language':   return firstToken(n.language);
+      case 'experience': return firstToken(n.experience);
+      case 'expertise':  return firstToken(n.expertise);
+      default:           return '';
+      }
+    }
+
+
+    /* ---- Legend helpers ----*/
+
+    function colorForNodeKeyByMode(key){
+      switch (nodeColorMode){
+          case 'city':       return cityTokenColor(key) || getBrandColor(key, 'fallback');
+          case 'project':    return getBrandColor(firstToken(key), 'project');
+          case 'language':   return getBrandColor(firstToken(key), 'language');
+          case 'event':      return getBrandColor(key, 'event');
+          case 'experience': return getBrandColor(firstToken(key), 'experience');
+          case 'expertise':  return getBrandColor(firstToken(key), 'expertise');
+          default:           return COL_NODE_DEFAULT;
+        }
+      }
+
+
+
+    function titleForMode(){
+      switch (nodeColorMode){
+        case 'city':       return 'Nodes colored by: City';
+        case 'project':    return 'Nodes colored by: Edgelands Project';
+        case 'language':   return 'Nodes colored by: Language';
+        case 'event':      return 'Nodes colored by: Connection';
+        case 'experience': return 'Nodes colored by: Edgelands Experience';
+        case 'expertise':  return 'Nodes colored by: Expertise';
+        default:           return 'Nodes colored by: None';
+      }
+    }
+
+    function facetKeyForColorMode(mode){
+      switch (mode){
+        case 'city':       return 'city';       // non-tokenized
+        case 'project':    return 'project';    // tokenized
+        case 'language':   return 'language';   // tokenized
+        case 'event':      return 'event';      // non-tokenized 
+        case 'experience': return 'experience'; // tokenized
+        case 'expertise':  return 'expertise';  // tokenized
+        default:           return null;
+      }
+    }
+
+
+    const LEGEND_MAX = 5;  // Max number of legend rows to show before collapsing into “+N more…”
+
+
+    function legendBuckets(nodes, activeIds){
+      const all = new Map(), vis = new Map();
+      for (const n of nodes){
+        const key = primaryKeyForMode(n, nodeColorMode);
+        if (!key) continue;
+        all.set(key, (all.get(key)||0) + 1);
+        if (activeIds.has(n.id)) vis.set(key, (vis.get(key)||0) + 1);
+      }
+      const rows = [...all.entries()].map(([key,countAll]) => ({
+        key,
+        label: key,
+        countAll,
+        countVis: vis.get(key) || 0,
+        color: colorForNodeKeyByMode(key)
+      }));
+      rows.sort((a,b)=> b.countAll - a.countAll || a.label.localeCompare(b.label));
+      return rows;
+    }
+
+
+    // Return a Set of currently-checked values for a facet, by reading the DOM.
+    function currentFacetSelection(facetKey){
+      const wrap = document.querySelector(`.facet[data-key="${facetKey}"]`);
+      const sel = new Set();
+      if (!wrap) return sel;
+      wrap.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => sel.add(cb.value));
+      return sel;
+    }
+
+    // For legend rendering: is a legend row "checked" right now?
+    function legendRowIsChecked(facetKey, valueOrValues){
+      const sel = currentFacetSelection(facetKey);
+      if (Array.isArray(valueOrValues)){
+        // For the "Other" bucket: consider checked only if ALL its members are selected
+        return valueOrValues.every(v => sel.has(v));
+      }
+      return sel.has(valueOrValues);
+    }
+
+    function setFacetValuesChecked(facetKey, values, checked){
+      const wrap = document.querySelector(`.facet[data-key="${facetKey}"]`);
+      if (!wrap) return;
+      const valueSet = new Set(values);
+
+      // Toggle only the affected boxes, then dispatch a *bubbling* change so the
+      // facet's delegated listener catches it and calls applyFilters().
+      wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        if (!valueSet.has(cb.value)) return;
+        const willChange = cb.checked !== !!checked;
+        cb.checked = !!checked;
+        if (willChange) cb.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+
+    function renderLegend(nodes, activeIds){
+      const box = document.getElementById('legend');
+      if (!box) return;
+
+      const facetKey = facetKeyForColorMode(nodeColorMode);
+      const buckets = legendBuckets(nodes, activeIds);
+
+      // If truncated, show top (LEGEND_MAX-1) then an interactive “Other”
+      const room = Math.max(0, LEGEND_MAX);
+      const showCount = Math.max(0, room - 1);
+      const showRows = buckets.slice(0, showCount);
+      const otherRows = buckets.slice(showCount); // may be empty
+
+      // Build HTML
+      const rowsHTML = showRows.map(b => {
+        const checked = legendRowIsChecked(facetKey, b.key);
+        return `
+              <div class="row legend-item" data-key="${b.key}" style="cursor:pointer;">
+                <span class="swatch" style="background:${b.color}"></span>
+                <span>${b.label}</span>
+                <span class="meta">${b.countVis}/${b.countAll}</span>
+              </div>
+              `;
+      }).join('');
+
+      const otherCount = otherRows.reduce((s, r) => s + r.count, 0);
+      const otherKeys = otherRows.map(r => r.key);
+
+      const otherHTML = otherRows.length ? (() => {
+        const checked = legendRowIsChecked(facetKey, otherKeys);
+        // “Other” uses a neutral swatch
+        return `
+          <div class="row legend-item" data-other="1" data-keys='${JSON.stringify(otherKeys)}' style="cursor:pointer;">
+            <span class="swatch" style="background:rgba(150,150,150,.6)"></span>
+            <span>Other</span>
+            <span class="meta">${otherCount}</span>
+          </div>
+          `;
+      })() : '';
+
+      box.innerHTML = `
+        <div class="legend-head">
+          <h3>${titleForMode()}</h3>
+          <button class="legend-close" aria-label="Close legend">×</button>
+        </div>
+        ${rowsHTML}
+        ${otherHTML}
+      `;
+
+      box.querySelector('.legend-close')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setLegendVisible(false);
+      });
+
+
+
+      // Wire interactivity → toggle facet selections
+      box.querySelectorAll('.legend-item').forEach(row => {
+        row.addEventListener('click', (e) => {
+          // allow clicking the whole row 
+          const isOther = row.hasAttribute('data-other');
+          const values = isOther
+            ? JSON.parse(row.getAttribute('data-keys') || '[]')
+            : [row.getAttribute('data-key')];
+
+          const facet = facetKeyForColorMode(nodeColorMode);
+          if (!facet || values.length === 0) return;
+
+          // Toggle: if ALL values are selected → unselect all; else select all
+          const currentlyChecked = legendRowIsChecked(facet, values);
+          setFacetValuesChecked(facet, values, !currentlyChecked);
+        });
+      });
+    }
+
+    function setLegendVisible(v){
+      const box = document.getElementById('legend');
+      const btn = document.getElementById('legendToggle');
+      if (!box || !btn) return;
+      box.classList.toggle('is-hidden', !v);
+      box.classList.toggle('is-shown',  !!v);
+      btn.setAttribute('aria-expanded', String(!!v));
+      localStorage.setItem('legend:visible', String(!!v));
+    }
+    function getLegendInitialVisibility(){
+      const saved = localStorage.getItem('legend:visible');
+      if (saved !== null) return saved === 'true';
+      return false;  // default hidden
+    }
+    </script>
+  </head>
+
+  <body class="theme--casual">
+  <div id="layout">
+    <!-- Left -->
+    <div id="left" class="panel">
+      <h2>EDGELANDS NETWORK</h2>
+
+      <!-- Quick view presets -->
+      <div class="view-presets">
+        <button id="randomViewBtn" class="btn-view">Random view</button>
+        <button id="defaultViewBtn" class="btn-view">Default view</button>
+      </div>
+
+
+      <!-- ===== VIEW group ===== -->
+      <section class="group" id="group-view">
+        <div class="group-title">View</div>
+        <div class="group-body">
+
+          <!-- Selection tools (hidden — we replace with floating pills) -->
+          <div class="box collapsible" id="box-selection" style="display:none">
+            <div class="box-head">
+              <button class="box-toggle" id="toggle-selection" aria-expanded="false" aria-controls="selection-body">Selection tools</button>
+            </div>
+            <div class="box-body" id="selection-body">
+              <div class="row">
+                <button id="reset">Reset view</button>
+                <button id="clearSel">Clear selection</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters (collapsed by default) -->
+          <div class="box collapsible" id="box-filters">
+            <div class="box-head">
+              <button class="box-toggle" id="toggle-filters" aria-expanded="false" aria-controls="filters-body">Filters</button>
+            </div>
+            <div class="box-body" id="filters-body">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+                <button id="clearAllFilters" style="font-size:11px; padding:4px 8px">Clear all filters</button>
+              </div>
+              <div id="filters"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ===== CUSTOMIZATION group ===== -->
+      <section class="group" id="group-custom">
+        <div class="group-title">Customization</div>
+        <div class="group-body">
+
+          <!-- Coloring (collapsed by default) -->
+          <div class="box collapsible" id="box-coloring">
+            <div class="box-head">
+              <button class="box-toggle" id="toggle-coloring" aria-expanded="false" aria-controls="coloring-body">Coloring</button>
+            </div>
+            <div class="box-body" id="coloring-body">
+              <label style="margin-top:0">Node color by</label>
+                <select id="nodeColorBy">
+                  <option value="city" selected>City</option>
+                  <option value="project">Edgelands Project</option>
+                  <option value="language">Language</option>
+                  <option value="event">Connection</option>
+                  <option value="experience">Edgelands Experience</option>
+                  <option value="expertise">Expertise</option>
+                  <option value="none">None (single)</option>
+                </select>
+            </div>
+          </div>
+
+          <!-- Edge rule: SIMILARITY -->
+          <div class="box collapsible" id="box-edge">
+            <div class="box-head">
+              <button class="box-toggle" id="toggle-edge" aria-expanded="false" aria-controls="edge-body">Edge rule (advanced)</button>
+            </div>
+            <div class="box-body" id="edge-body">
+              <label>Mode</label>
+              <select id="edgeMode">
+                <option value="similarity" selected>Similarity (custom)</option>
+                <option value="random">Random (demo)</option>
+              </select>
+
+              <div id="simOptions" style="margin-top:10px">
+                <div class="muted" style="margin-bottom:6px">Similarity fields (check to include)</div>
+                <label class="row"><input type="checkbox" id="simChk-language"><span>Language</span></label>
+                <label class="row"><input type="checkbox" id="simChk-project"  checked><span>Edgelands Project</span></label>
+                <label class="row"><input type="checkbox" id="simChk-city"><span>City</span></label>
+                <label class="row"><input type="checkbox" id="simChk-expertise"><span>Expertise</span></label>
+                <label class="row"><input type="checkbox" id="simChk-experience"><span>Edgelands Experience</span></label>
+
+                <div class="row" style="align-items:center; gap:12px; margin-top:12px">
+                  <label style="margin:0; min-width:110px">Threshold</label>
+                  <input type="range" id="simThreshold" min="0" max="100" step="5" value="10">
+                  <div id="simThresholdLabel" style="width:40px; text-align:right">10%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </div>
+
+    <!-- Graph -->
+    <div id="graph" class="vis3d">
+      <div id="3d"></div>
+      <div id="legend" class="legend"></div>
+      <button id="legendToggle" class="pill" aria-expanded="false" aria-controls="legend">Legend</button>
+
+      <!-- Floating action pills -->
+      <button id="resetFloating" class="pill">Reset view</button>
+      <button id="clearSelFloating" class="pill">Clear selection</button>
+      <button id="clearFiltersFloating" class="pill">Clear filters</button>
+    </div>
+
+    <!-- Right -->
+    <div id="right" class="panel">
+      <div id="details" class="details">
+        <div class="muted">Click a node or table row to see details here.</div>
+      </div>
+    </div>
+
+    <!-- Bottom -->
+    <div id="bottom" class="panel">
+      <div id="counts">Visible: —</div>
+      <div class="frame-title">Table</div>
+
+      <!-- Global search UI -->
+      <div class="row" id="global-search-row" style="gap:8px; align-items:center; margin:8px 0">
+        <input id="globalSearch" type="search" placeholder="Search all columns e.g., Nairobi, data..."
+              style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:8px; min-width:180px">
+        <button id="clearSearch" type="button" title="Clear"
+                style="padding:6px 10px; border:1px solid #ccc; border-radius:8px; background:#f7f7f7">×</button>
+      </div>
+
+      <div class="muted" style="margin:-2px 0 6px 0;">Tip: Cmd/Ctrl-click to multi-select, Shift-click for ranges</div>
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th data-col="last">LAST NAME ▲▼</th>
+            <th data-col="first">FIRST NAME ▲▼</th>
+            <th data-col="email">EMAIL ▲▼</th>
+            <th data-col="city">CITY ▲▼</th>
+            <th data-col="event">CONNECTION ▲▼</th>
+            <th data-col="project">EDGELANDS PROJECT ▲▼</th>
+            <th data-col="language">LANGUAGE ▲▼</th>
+            <th data-col="experience">EXPERIENCE ▲▼</th>
+            <th data-col="expertise">EXPERTISE ▲▼</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+  (async function boot(){
+    const rows = await loadRows();
+
+    const nodes = rows.map((r,i)=>({
+      id:'p'+(i+1),
+      label:[r.first||'', r.last||''].filter(Boolean).join(' ').trim()||'(unnamed)',
+      first:r.first||'', last:r.last||'', email:r.email||'',
+      city:r.city||'', event:r.event||'',
+      project:r.project||'', org:r.project||'',
+      language:r.language||'', experience:r.experience||'', expertise:r.expertise||''
+    }));
+
+    let links=[];
+    const selectedIds=new Set();
+    let lastClickedIndex=null;
+
+    // "Active" (passes filters/search) and "Neighbor" (touches a selection)
+    const activeIds   = new Set();
+    const neighborIds = new Set();
+
+    // DOM refs
+    const $edgeMode=document.getElementById('edgeMode');
+    const $simOptions=document.getElementById('simOptions');
+    const $th=document.getElementById('simThreshold');
+    const $thLbl=document.getElementById('simThresholdLabel'); $thLbl.textContent = $th.value + '%';
+    const $counts=document.getElementById('counts');
+    const $tbody=document.querySelector('#tbl tbody');
+    const $details=document.getElementById('details');
+    const $filters=document.getElementById('filters');
+    const $nodeColorBy=document.getElementById('nodeColorBy');
+    const $legendToggle = document.getElementById('legendToggle');
+    const $resetFloating = document.getElementById('resetFloating');
+    const $clearSelFloating = document.getElementById('clearSelFloating');
+
+
+    // --- Quick view preset buttons (hook into the real edge mode) ---
+    const $randomBtn  = document.getElementById('randomViewBtn');
+    const $defaultBtn = document.getElementById('defaultViewBtn');
+
+    if ($randomBtn) {
+      $randomBtn.addEventListener('click', () => {
+        // Switch to the existing "random" mode via the same handler as the dropdown
+        $edgeMode.value = 'random';
+        $edgeMode.dispatchEvent(new Event('change')); 
+      });
+    }
+
+    if ($defaultBtn) {
+      $defaultBtn.addEventListener('click', () => {
+        $edgeMode.value = 'similarity';
+        $edgeMode.dispatchEvent(new Event('change'));
+      });
+    }
+
+
+    // --- Global search refs/state ---
+    const $search = document.getElementById('globalSearch');
+    const $clearSearch = document.getElementById('clearSearch');
+    let searchTerms = [];
+    function setSearchTerms(val) {
+      searchTerms = String(val || '')
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    }
+    function debounce(fn, ms=150) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
+    function rowMatchesSearch(node) {
+      if (searchTerms.length === 0) return true;
+      const flatValues = (val) => Array.isArray(val) ? val : [val];
+      const haystack = Object.values(node)
+        .flatMap(flatValues)
+        .filter(v => typeof v === 'string' || typeof v === 'number')
+        .join(' ')
+        .toLowerCase();
+      return searchTerms.every(t => haystack.includes(t));
+    }
+    $search?.addEventListener('input', debounce(e => { setSearchTerms(e.target.value); applyFilters(); }, 150));
+    $clearSearch?.addEventListener('click', () => { $search.value=''; setSearchTerms(''); applyFilters(); });
+
+    // Collapsibles with persistence (defaults updated)
+    function initCollapsible(boxId, storageKey, defaultOpen=false){
+      const box=document.getElementById(boxId);
+      const btn=box.querySelector('.box-toggle');
+      const key='collapse:'+storageKey;
+      let open = localStorage.getItem(key);
+      open = open==null ? defaultOpen : (open==='true');
+      const set=(v)=>{ btn.setAttribute('aria-expanded', v); box.classList.toggle('is-closed', !v); };
+      set(open);
+      const toggle=()=>{ open=!open; set(open); localStorage.setItem(key, String(open)); };
+      btn.addEventListener('click', toggle);
+      btn.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); }});
+    }
+    initCollapsible('box-filters','filters', false);
+    initCollapsible('box-coloring','coloring', false);
+    initCollapsible('box-edge','edge-v2', false);
+
+    // Sorting
+    let sortCol='last', sortAsc=true;
+
+    // Token sets for OR facets and similarity
+    const tokenFacetKeys=new Set(['language','experience','expertise','project']);
+    const nodeTokens={}; nodes.forEach(n=>{
+      nodeTokens[n.id]={};
+      for(const k of tokenFacetKeys){
+        nodeTokens[n.id][k]=new Set((n[k]||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean));
+      }
+    });
+
+    // 3D graph
+    const world=ForceGraph3D()(document.getElementById('3d'))
+      .graphData({nodes,links})
+      .nodeId('id')
+      .nodeLabel(n=>[n.label,[n.project,n.city].filter(Boolean).join(' — ')].filter(Boolean).join('\n'))
+      .nodeRelSize(4)
+      .nodeOpacity(0.95)
+      .linkOpacity(0.18)
+      .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim()||'#0b0b0b')
+      .onNodeClick(n=>toggleSelectById(n.id));
+      world.onBackgroundClick(() => {selectedIds.clear(); lastClickedIndex = null; renderSelectedCards(); applyFilters();});
+
+
+    
+    world.showNavInfo(false);  
+    const navTip = document.createElement('div');
+    navTip.className = 'navinfo';
+    navTip.textContent = 'Left click: rotate · Wheel/middle: zoom · Right click: pan';
+    document.getElementById('graph').appendChild(navTip);
+
+
+    // One-time frame after layout starts
+    setTimeout(()=>frameToBounds(4.2), 900);
+    const graphWrap=document.getElementById('graph');
+    new ResizeObserver(()=>{ world.width(graphWrap.clientWidth).height(graphWrap.clientHeight); }).observe(graphWrap);
+    world.width(graphWrap.clientWidth).height(graphWrap.clientHeight);
+
+    function frameToBounds(mult=3.8){
+      const arr=world.graphData().nodes; if(!arr.length) return;
+      let minX=+Infinity,minY=+Infinity,minZ=+Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
+      arr.forEach(n=>{ minX=Math.min(minX,n.x||0); maxX=Math.max(maxX,n.x||0);
+                      minY=Math.min(minY,n.y||0); maxY=Math.max(maxY,n.y||0);
+                      minZ=Math.min(minZ,n.z||0); maxZ=Math.max(maxZ,n.z||0); });
+      const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2;
+      const rx=maxX-minX, ry=maxY-minY, rz=maxZ-minZ;
+      const radius=Math.max(rx,ry,rz)/2 || 120;
+      world.cameraPosition({x:cx+radius*mult, y:cy+radius*mult, z:cz+radius*mult}, {x:cx,y:cy,z:cz}, 800);
+    }
+
+    // ===== State → colors & widths
+    window.nodeColorMode = 'city';
+
+    function recomputeNeighbors(){
+      neighborIds.clear();
+      if (selectedIds.size===0) return;
+      for (const l of links){
+        const s = typeof l.source==='object' ? l.source.id : l.source;
+        const t = typeof l.target==='object' ? l.target.id : l.target;
+        if (selectedIds.has(s)) neighborIds.add(t);
+        if (selectedIds.has(t)) neighborIds.add(s);
+      }
+    }
+
+    function nodeColor(n){
+      if (selectedIds.has(n.id)) return COL_SELECTED;
+      if (activeIds.has(n.id) || neighborIds.has(n.id)){
+        const key = primaryKeyForMode(n, nodeColorMode);
+        switch(nodeColorMode){
+          case 'city':       { const c = cityTokenColor(key); return c || getBrandColor(key, 'fallback'); }
+          case 'project':    return getBrandColor(key, 'project');
+          case 'language':   return getBrandColor(key, 'language');
+          case 'event':      return getBrandColor(key, 'event');
+          case 'experience': return getBrandColor(key, 'experience');
+          case 'expertise':  return getBrandColor(key, 'expertise');
+          default:           return COL_NODE_DEFAULT;
+        }
+      }
+      return MUTED_NODE;
+    }
+
+
+    function edgeColor(l){
+      const s = typeof l.source==='object' ? l.source : nodes.find(n=>n.id===l.source);
+      const t = typeof l.target==='object' ? l.target : nodes.find(n=>n.id===l.target);
+      const sId=s.id, tId=t.id;
+      if (selectedIds.has(sId) || selectedIds.has(tId)) return COL_SELECTED;
+      const bothActive = activeIds.has(sId) && activeIds.has(tId);
+      if (bothActive){
+        if (l.kind==='sim')   return 'rgba(200,200,200,0.65)';
+        if (l.kind==='random')return 'rgba(150,150,150,0.45)';
+        return 'rgba(180,180,180,0.6)';
+      }
+      return MUTED_LINK;
+    }
+
+    function applyColors(){
+      world.nodeColor(nodeColor);
+      world.linkColor(edgeColor);
+
+      // Widths: thin in neutral; only incumbent edges get thick when something is selected
+      world.linkWidth(l => {
+        const sId = typeof l.source==='object' ? l.source.id : l.source;
+        const tId = typeof l.target==='object' ? l.target.id : l.target;
+
+        const touchesSel = selectedIds.has(sId) || selectedIds.has(tId);
+        if (touchesSel) return 3.6 + (l.score||0)*1.6;   // only edges touching selection
+
+        if (selectedIds.size) return 0.22;               // others stay thin during selection
+
+        // Neutral (no selection): keep everything thin (previous look)
+        return 0.24;
+      });
+
+      // Opacity: selected edges pop; others stay calm 
+      world.linkOpacity(l => {
+        const sId = typeof l.source==='object' ? l.source.id : l.source;
+        const tId = typeof l.target==='object' ? l.target.id : l.target;
+
+        const touchesSel = selectedIds.has(sId) || selectedIds.has(tId);
+        if (touchesSel) return 0.9;                      // incumbent edges bright when selected
+        if (selectedIds.size) return 0.08;               // non-incumbent edges dim during selection
+        return 0.14;                                     // neutral state
+      });
+
+
+      world.nodeOpacity(0.95);
+    }
+
+
+    // ===== Edge building 
+    function getSimilaritySettings(){
+      const fields=[];
+      if (document.getElementById('simChk-language').checked)  fields.push('language');
+      if (document.getElementById('simChk-project').checked)   fields.push('project');
+      if (document.getElementById('simChk-city').checked)      fields.push('city');
+      if (document.getElementById('simChk-expertise').checked) fields.push('expertise');
+      if (document.getElementById('simChk-experience').checked)fields.push('experience');
+      const threshold = (+$th.value)/100;
+      return { fields, threshold };
+    }
+    function jaccard(aSet,bSet){
+      if (!aSet.size && !bSet.size) return NaN;
+      let inter=0;
+      if (aSet.size < bSet.size) { aSet.forEach(v=>{ if(bSet.has(v)) inter++; }); }
+      else { bSet.forEach(v=>{ if(aSet.has(v)) inter++; }); }
+      const union = new Set([...aSet, ...bSet]).size;
+      return union ? inter/union : NaN;
+    }
+    function pairSimilarity(a,b,fields){
+      const scores=[];
+      for(const f of fields){
+        if (f==='city'){
+          const va=(a.city||'').trim(), vb=(b.city||'').trim();
+          if (va==='' && vb==='') continue;
+          scores.push(va && vb ? (va===vb?1:0) : 0);
+        } else {
+          const A=nodeTokens[a.id][f]||new Set(), B=nodeTokens[b.id][f]||new Set();
+          const s=jaccard(A,B); if (!Number.isNaN(s)) scores.push(s);
+        }
+      }
+      if (!scores.length) return 0;
+      return scores.reduce((x,y)=>x+y,0)/scores.length;
+    }
+    function rebuildLinks(mode){
+      links=[];
+      if (mode==='random'){
+        const ids=nodes.map(n=>n.id);
+        const m=Math.min(ids.length*2,600), used=new Set();
+        while(used.size<m){
+          const s=ids[Math.floor(Math.random()*ids.length)], t=ids[Math.floor(Math.random()*ids.length)];
+          if(s===t) continue; const key=s<t?`${s}|${t}`:`${t}|${s}`;
+          if(!used.has(key)){used.add(key); links.push({source:s,target:t,kind:'random'})}
+        }
+        world.graphData({nodes,links});
+        applyFilters();
+        return;
+      }
+      const {fields, threshold} = getSimilaritySettings();
+      if (!fields.length){
+        world.graphData({nodes,links});
+        applyFilters();
+        return;
+      }
+      for(let i=0;i<nodes.length;i++){
+        for(let j=i+1;j<nodes.length;j++){
+          const a=nodes[i], b=nodes[j];
+          const score = pairSimilarity(a,b,fields);
+          if (score >= threshold){
+            links.push({source:a.id, target:b.id, kind:'sim', score});
+          }
+        }
+      }
+      world.graphData({nodes,links});
+      applyFilters();
+    }
+
+    // ===== Right cards, counts, filters =====
+    function renderSelectedCards(){
+      if(selectedIds.size===0){ $details.innerHTML='<div class="muted">Click a node or table row to see details here.</div>'; return; }
+      const sel=[...selectedIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean).sort((a,b)=>(a.last||'').localeCompare(b.last||''));
+      $details.innerHTML=['<div class="muted" style="margin-bottom:6px">',sel.length,' selected</div><div class="cards">', ...sel.map(n=>`
+        <div class="person-card" data-id="${n.id}">
+          <div class="pc-name">${[n.first,n.last].filter(Boolean).join(' ')||'(unnamed)'}</div>
+          ${n.email?`<div class="pc-row"><a class="pc-email" href="mailto:${n.email}">${n.email}</a></div>`:''}
+          <div class="pc-row">${[n.city,n.event].filter(Boolean).join(' · ')}</div>
+          ${n.project?`<div class="pc-row">${n.project}</div>`:''}
+          <div class="pc-tags">
+            ${n.language?`Language: ${n.language}`:''}${n.language&&(n.experience||n.expertise)?' · ':''}
+            ${n.experience?`Exp: ${n.experience}`:''}${n.experience&&n.expertise?' · ':''}
+            ${n.expertise?`Expertise: ${n.expertise}`:''}
+          </div>
+        </div>`),'</div>'].join('');
+      $details.querySelectorAll('.person-card').forEach(card=>{
+        card.addEventListener('click',()=>{const id=card.getAttribute('data-id'), n=nodes.find(x=>x.id===id); if(!n) return; world.cameraPosition({x:(n.x||0)+120,y:(n.y||0)+120,z:(n.z||0)+120},{x:n.x||0,y:n.y||0,z:n.z||0},800);});
+      });
+    }
+
+    function updateCounts(){
+      const visN = activeIds.size || 0;
+      let visE = 0;
+      for (const l of links){
+        const s = typeof l.source==='object' ? l.source.id : l.source;
+        const t = typeof l.target==='object' ? l.target.id : l.target;
+        if (activeIds.has(s) && activeIds.has(t)) visE++;
+      }
+      $counts.textContent = `Visible: ${visN} nodes, ${visE} edges`;
+    }
+
+    const facetDefs=[
+      {title:'Connection', key:'event', tokenized:false},
+      {title:'Edgelands Project', key:'project', tokenized:true},
+      {title:'Language', key:'language', tokenized:true},
+      {title:'Edgelands Experience', key:'experience', tokenized:true},
+      {title:'Expertise', key:'expertise', tokenized:true},
+      {title:'City', key:'city', tokenized:false},
+    ];
+    const selectedFacets=Object.fromEntries(facetDefs.map(f=>[f.key,new Set()]));
+
+    function uniqueSortedValues(def){
+      const {key,tokenized}=def, values=new Set();
+      nodes.forEach(n=>{
+        const raw=(n[key]||'').trim(); if(!raw) return;
+        if(tokenized) raw.split(TOKEN_SPLIT).forEach(p=>{const t=p.trim(); if(t) values.add(t)});
+        else values.add(raw);
+      });
+      return [...values].sort((a,b)=>a.localeCompare(b));
+    }
+
+    // Facets builder: each facet collapsible & collapsed by default
+    function makeFacet(def){
+      const values=uniqueSortedValues(def);
+      const wrap=document.createElement('div'); wrap.className='facet'; wrap.dataset.key=def.key;
+
+      // header
+      const header=document.createElement('div'); header.className='facet-header';
+      const title=document.createElement('div'); title.className='title'; title.textContent=def.title;
+      const actions=document.createElement('div'); actions.className='actions';
+      const aAll=document.createElement('button'); aAll.type='button'; aAll.textContent='Select all';
+      const aClr=document.createElement('button'); aClr.type='button'; aClr.textContent='Clear';
+      actions.append(aAll,aClr); header.append(title, actions);
+
+      // body
+      const body=document.createElement('div'); body.className='facet-body';
+      const list=document.createElement('div'); list.className='facet-list';
+      values.forEach(v=>{const id=`chk-${def.key}-${v.replace(/[^a-z0-9]+/gi,'').toLowerCase()}`; const row=document.createElement('label'); row.className='facet-item'; row.title=v; row.innerHTML=`<input type="checkbox" value="${v}" id="${id}"><span>${v}</span>`; list.appendChild(row)});
+      body.appendChild(list);
+
+      wrap.append(header, body); $filters.appendChild(wrap);
+
+      // collapse logic with storage
+      const key='facet:'+def.key;
+      let open = localStorage.getItem(key);
+      open = open==null ? false : (open==='true');
+      wrap.classList.toggle('is-collapsed', !open);
+      header.addEventListener('click', (e)=>{
+        if (e.target===aAll || e.target===aClr) return;
+        open=!open; wrap.classList.toggle('is-collapsed', !open); localStorage.setItem(key, String(open));
+      });
+
+      // actions + change handlers
+      list.addEventListener('change',e=>{ if(e.target && e.target.type==='checkbox'){const val=e.target.value; if(e.target.checked) selectedFacets[def.key].add(val); else selectedFacets[def.key].delete(val); applyFilters()}});
+      aAll.onclick=()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(cb=>{cb.checked=true; selectedFacets[def.key].add(cb.value)}); applyFilters() };
+      aClr.onclick=()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); selectedFacets[def.key].clear(); applyFilters() };
+    }
+    function buildFacets(){ $filters.innerHTML=''; facetDefs.forEach(def=>makeFacet(def)) }
+
+    function rowPassesFacets(n){
+      for(const def of facetDefs){
+        const sel=selectedFacets[def.key]; if(sel.size===0) continue;
+        if(def.tokenized){ const toks=nodeTokens[n.id][def.key]||new Set(); let hit=false; for(const w of sel){ if(toks.has(w)){ hit=true; break } } if(!hit) return false; }
+        else { const val=(n[def.key]||'').trim(); if(!sel.has(val)) return false; }
+      } return true;
+    }
+
+    // ===== Filtering & coloring 
+    function applyFilters(){
+      activeIds.clear();
+      nodes.forEach(n => { if (rowPassesFacets(n) && rowMatchesSearch(n)) activeIds.add(n.id); });
+      recomputeNeighbors();
+
+      renderTable();
+      updateCounts();
+      applyColors();
+      renderLegend(nodes, activeIds);
+    }
+
+    // ===== Table =====
+    let currentTableOrder = nodes.map(n => n.id);
+    function renderTable(){
+      const rowsActive = nodes.filter(n => activeIds.has(n.id));
+      rowsActive.sort((a,b)=>{
+        const av=(a[sortCol]||'').toString().toLowerCase();
+        const bv=(b[sortCol]||'').toString().toLowerCase();
+        return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+      currentTableOrder = rowsActive.map(n=>n.id);
+
+      const tr = rowsActive.map(n => `
+        <tr data-id="${n.id}" class="${selectedIds.has(n.id)?'selected':''}">
+          <td>${n.last||''}</td>
+          <td>${n.first||''}</td>
+          <td>${n.email||''}</td>
+          <td>${n.city||''}</td>
+          <td>${n.event||''}</td>
+          <td>${n.project||''}</td>
+          <td>${n.language||''}</td>
+          <td>${n.experience||''}</td>
+          <td>${n.expertise||''}</td>
+        </tr>`).join('');
+      $tbody.innerHTML = tr || `<tr><td colspan="9" class="muted">No rows</td></tr>`;
+
+      const rowsEls = Array.from($tbody.querySelectorAll('tr'));
+      rowsEls.forEach((rowEl, idx) => {
+        rowEl.onclick = (ev) => {
+          const id = rowEl.getAttribute('data-id');
+          const node = nodes.find(n=>n.id===id);
+          if(!node) return;
+
+          if (ev.shiftKey && lastClickedIndex != null) {
+            const a = Math.min(lastClickedIndex, idx), b = Math.max(lastClickedIndex, idx);
+            selectedIds.clear();
+            for (let i=a;i<=b;i++) selectedIds.add(currentTableOrder[i]);
+          } else if (ev.metaKey || ev.ctrlKey) {
+            if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
+            lastClickedIndex = idx;
+          } else {
+            if (selectedIds.has(node.id)) selectedIds.delete(node.id); else selectedIds.add(node.id);
+            lastClickedIndex = idx;
+          }
+          renderSelectedCards();
+          applyFilters();
+        };
+      });
+    }
+
+    function toggleSelectById(id){
+      if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+      const tr=$tbody.querySelector(`tr[data-id="${id}"]`); if(tr) tr.scrollIntoView({block:'nearest'});
+      renderSelectedCards(); applyFilters();
+    }
+
+    // UI wiring
+    document.querySelectorAll('#tbl thead th').forEach(th=>{ th.onclick=()=>{ const c=th.dataset.col; sortAsc=(sortCol===c)?!sortAsc:true; sortCol=c; renderTable() }});
+    document.getElementById('nodeColorBy').onchange=()=>{ window.nodeColorMode = $nodeColorBy.value; applyColors(); renderLegend(nodes, activeIds); setLegendVisible(true);};
+    document.getElementById('clearAllFilters').onclick = doClearFilters;
+
+    $edgeMode.onchange=()=>{
+      const sim = $edgeMode.value==='similarity';
+      $simOptions.style.display = sim ? 'block' : 'none';
+      rebuildLinks($edgeMode.value);
+      setLegendVisible(false);
+      setLegendVisible(getLegendInitialVisibility());
+    };
+    $th.oninput=()=>{ $thLbl.textContent = $th.value + '%'; rebuildLinks($edgeMode.value); };
+    ['language','project','city','expertise','experience'].forEach(k=>{
+      document.getElementById('simChk-'+k).onchange=()=>rebuildLinks($edgeMode.value);
+    });
+
+
+    function doClearFilters(){
+    // clear facet selections
+      for (const def of facetDefs){
+        selectedFacets[def.key].clear();
+        const wrap = document.querySelector(`.facet[data-key="${def.key}"]`);
+        if (wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      }
+      // clear global search
+      setSearchTerms('');
+      const s = document.getElementById('globalSearch');
+      if (s) s.value = '';
+      applyFilters();
+    }
+
+
+    // Floating action pills
+    function doReset(){
+      frameToBounds(4.2); selectedIds.clear(); lastClickedIndex=null;
+      for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=$filters.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false) }
+      setSearchTerms(''); const s=document.getElementById('globalSearch'); if (s) s.value='';
+      renderSelectedCards(); rebuildLinks($edgeMode.value); renderLegend(nodes, activeIds);
+    }
+    function doClearSel(){ selectedIds.clear(); lastClickedIndex=null; renderSelectedCards(); applyFilters(); }
+
+    $resetFloating.onclick = doReset;
+    $clearSelFloating.onclick = doClearSel;
+    document.getElementById('clearFiltersFloating').onclick = doClearFilters;
+
+
+    // Legend pill + keyboard
+    $legendToggle.onclick = () => { const expanded = $legendToggle.getAttribute('aria-expanded') === 'true'; setLegendVisible(!expanded); };
+    document.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'l' && !e.metaKey && !e.ctrlKey && !e.altKey){
+        e.preventDefault();
+        const expanded = $legendToggle.getAttribute('aria-expanded') === 'true';
+        setLegendVisible(!expanded);
+      }
+    });
+
+    // Init
+    buildFacets();
+    renderTable();
+    renderSelectedCards();
+    rebuildLinks($edgeMode.value);
+    setLegendVisible(false);  // hide legend on first load
+  })();
+
+
+
+  </script>
+  </body>
+  </html>
