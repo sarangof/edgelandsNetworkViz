@@ -189,8 +189,6 @@
       });
     }
 
-
-
     function renderLegend(nodes, activeIds){
       const box = document.getElementById('legend');
       if (!box) return;
@@ -265,8 +263,6 @@
         });
       });
     }
-
-      
 
     function setLegendVisible(v){
       const box = document.getElementById('legend');
@@ -485,15 +481,14 @@
       $randomBtn.addEventListener('click', () => {
         // Switch to the existing "random" mode via the same handler as the dropdown
         $edgeMode.value = 'random';
-        $edgeMode.dispatchEvent(new Event('change')); // triggers your $edgeMode.onchange
+        $edgeMode.dispatchEvent(new Event('change')); 
       });
     }
 
     if ($defaultBtn) {
       $defaultBtn.addEventListener('click', () => {
-        // Restore the default mode used by your app ("similarity" in your <select>)
         $edgeMode.value = 'similarity';
-        $edgeMode.dispatchEvent(new Event('change')); // rebuilds links + legend reset
+        $edgeMode.dispatchEvent(new Event('change'));
       });
     }
 
@@ -655,7 +650,7 @@
         return 0.24;
       });
 
-      // Opacity: selected edges pop; others stay calm (no unintended brightening)
+      // Opacity: selected edges pop; others stay calm 
       world.linkOpacity(l => {
         const sId = typeof l.source==='object' ? l.source.id : l.source;
         const tId = typeof l.target==='object' ? l.target.id : l.target;
@@ -671,7 +666,7 @@
     }
 
 
-    // ===== Edge building (unchanged)
+    // ===== Edge building 
     function getSimilaritySettings(){
       const fields=[];
       if (document.getElementById('simChk-language').checked)  fields.push('language');
@@ -790,7 +785,7 @@
       return [...values].sort((a,b)=>a.localeCompare(b));
     }
 
-    // Facets builder: each facet collapsible & collapsed by default (remembers state)
+    // Facets builder: each facet collapsible & collapsed by default
     function makeFacet(def){
       const values=uniqueSortedValues(def);
       const wrap=document.createElement('div'); wrap.className='facet'; wrap.dataset.key=def.key;
@@ -836,7 +831,7 @@
       } return true;
     }
 
-    // ===== Filtering & coloring (graph stays complete)
+    // ===== Filtering & coloring 
     function applyFilters(){
       activeIds.clear();
       nodes.forEach(n => { if (rowPassesFacets(n) && rowMatchesSearch(n)) activeIds.add(n.id); });
