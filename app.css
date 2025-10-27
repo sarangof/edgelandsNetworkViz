@@ -544,3 +544,10 @@ tr.selected { background: rgba(217,255,75,.12); }
   #clearSelFloating     { left: 110px; }
   #clearFiltersFloating { left: 210px; }
 }
+
+/* Allow JS to place panels anywhere inside #graph */
+.overlay-panel.is-floating{
+  right: auto;   /* override the default right anchoring */
+  left:  0;      /* JS will set exact left/top */
+  top:   0;
+}

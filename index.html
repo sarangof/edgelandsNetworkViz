@@ -15,7 +15,6 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
   <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph"></script>
-  <script src="https://unpkg.com/3d-force-graph"></script>
   <script>
   const CSV_DEFAULT_PATH='database_Sep10.csv';
   const HEADER_MAP={"event/ connection":"event","connection":"event","last name":"last","first name":"first","email":"email","edgelands project":"project","language":"language","edgelands experience":"experience","expertise":"expertise","city":"city"};
@@ -98,9 +97,6 @@ Edgelands People Network — OVERLAY UI REFACTOR
     <div id="overlay-filters" class="overlay-panel" hidden>
       <div class="overlay-head"><div class="title">Filters</div><button class="overlay-close" data-close>×</button></div>
       <div class="overlay-body">
-        <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-          <button id="clearAllFilters" class="btn-chip">Clear all filters</button>
-        </div>
         <div id="filters"></div>
       </div>
     </div>
@@ -226,18 +222,73 @@ Edgelands People Network — OVERLAY UI REFACTOR
     .onNodeClick(n=>toggleSelectById(n.id));
   world.onBackgroundClick(()=>{ selectedIds.clear(); lastClickedIndex=null; renderPopups(); applyFilters(); });
   world.showNavInfo(false);
+
+  // Gentle continuous rotation
+  const controls = world.controls();
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.22;  // nudge 0.12–0.25
+
+
   const resize=()=>{ world.width($graphWrap.clientWidth).height($graphWrap.clientHeight); }; new ResizeObserver(resize).observe($graphWrap); resize();
 
-  function frameToBounds(mult=4.2){ const arr=world.graphData().nodes; if(!arr.length) return; let minX=+Infinity,minY=+Infinity,minZ=+Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity; arr.forEach(n=>{ minX=Math.min(minX,n.x||0); maxX=Math.max(maxX,n.x||0); minY=Math.min(minY,n.y||0); maxY=Math.max(maxY,n.y||0); minZ=Math.min(minZ,n.z||0); maxZ=Math.max(maxZ,n.z||0); }); const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2; const rx=maxX-minX, ry=maxY-minY, rz=maxZ-minZ; const radius=Math.max(rx,ry,rz)/2 || 120; world.cameraPosition({x:cx+radius*mult, y:cy+radius*mult, z:cz+radius*mult}, {x:cx,y:cy,z:cz}, 800); }
-  setTimeout(()=>frameToBounds(4.2),900);
+  function frameToBounds(mult=2.8){   
+    const arr = world.graphData().nodes;
+    if (!arr.length) return;
+    let minX=+Infinity,minY=+Infinity,minZ=+Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
+    arr.forEach(n=>{
+      minX=Math.min(minX,n.x||0); maxX=Math.max(maxX,n.x||0);
+      minY=Math.min(minY,n.y||0); maxY=Math.max(maxY,n.y||0);
+      minZ=Math.min(minZ,n.z||0); maxZ=Math.max(maxZ,n.z||0);
+    });
+    const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2;
+    const rx=maxX-minX, ry=maxY-minY, rz=maxZ-minZ;
+    const radius=Math.max(rx,ry,rz)/2 || 120;
+    world.cameraPosition(
+      {x:cx+radius*mult, y:cy+radius*mult, z:cz+radius*mult},
+      {x:cx,y:cy,z:cz},
+      800
+    );
+  }
+  setTimeout(()=>frameToBounds(2.8),900);
 
   // Color state
   window.nodeColorMode='city';
 
   function recomputeNeighbors(){ neighborIds.clear(); if(selectedIds.size===0) return; for(const l of links){ const s=typeof l.source==='object'?l.source.id:l.source; const t=typeof l.target==='object'?l.target.id:l.target; if(selectedIds.has(s)) neighborIds.add(t); if(selectedIds.has(t)) neighborIds.add(s); } }
   function nodeColor(n){ if(selectedIds.has(n.id)) return COL_SELECTED; if(activeIds.has(n.id)||neighborIds.has(n.id)){ const key=primaryKeyForMode(n,nodeColorMode); switch(nodeColorMode){ case 'city':{const c=cityTokenColor(key); return c||getBrandColor(key,'fallback');} case 'project':return getBrandColor(key,'project'); case 'language':return getBrandColor(key,'language'); case 'event':return getBrandColor(key,'event'); case 'experience':return getBrandColor(key,'experience'); case 'expertise':return getBrandColor(key,'expertise'); default:return COL_NODE_DEFAULT; } } return MUTED_NODE; }
-  function edgeColor(l){ const s=typeof l.source==='object'?l.source:nodes.find(n=>n.id===l.source); const t=typeof l.target==='object'?l.target:nodes.find(n=>n.id===l.target); const sId=s.id, tId=t.id; if(selectedIds.has(sId)||selectedIds.has(tId)) return COL_SELECTED; const bothActive=activeIds.has(sId)&&activeIds.has(tId); if(bothActive){ if(l.kind==='sim') return 'rgba(200,200,200,0.65)'; if(l.kind==='random') return 'rgba(150,150,150,0.45)'; return 'rgba(180,180,180,0.6)'; } return MUTED_LINK; }
-  function applyColors(){ world.nodeColor(nodeColor); world.linkColor(edgeColor); world.linkWidth(l=>{ const sId=typeof l.source==='object'?l.source.id:l.source; const tId=typeof l.target==='object'?l.target.id:l.target; const touchesSel=selectedIds.has(sId)||selectedIds.has(tId); if(touchesSel) return 3.6+(l.score||0)*1.6; if(selectedIds.size) return 0.22; return 0.24; }); world.linkOpacity(l=>{ const sId=typeof l.source==='object'?l.source.id:l.source; const tId=typeof l.target==='object'?l.target.id:l.target; const touchesSel=selectedIds.has(sId)||selectedIds.has(tId); if(touchesSel) return 0.9; if(selectedIds.size) return 0.08; return 0.14; }); world.nodeOpacity(0.95); }
+  function edgeColor(l){
+    const s = typeof l.source==='object'? l.source : nodes.find(n=>n.id===l.source);
+    const t = typeof l.target==='object'? l.target : nodes.find(n=>n.id===l.target);
+    const sId = s.id, tId = t.id;
+
+    // Highlight only edges touching a selected node
+    if (selectedIds.has(sId) || selectedIds.has(tId)) return COL_SELECTED;
+
+    // Unified neutral for everything else (idle AND non-incident during selection)
+    return '#bfbfbf';
+  }
+
+  function applyColors(){ 
+    world.nodeColor(nodeColor); 
+    world.linkColor(edgeColor);
+    world.linkWidth(l=>{
+      const sId=typeof l.source==='object'?l.source.id:l.source;
+      const tId=typeof l.target==='object'?l.target.id:l.target;
+      const touchesSel=selectedIds.has(sId)||selectedIds.has(tId);
+      if (touchesSel) return 3.6 + (l.score||0) * 1.6;
+      if (selectedIds.size) return 0.18;   
+      return 0.22;                         
+    });
+    world.linkOpacity(l=>{
+      const sId = typeof l.source==='object'? l.source.id : l.source;
+      const tId = typeof l.target==='object'? l.target.id : l.target;
+      const touchesSel = selectedIds.has(sId) || selectedIds.has(tId);
+      if (touchesSel) return 0.9;   
+      return 0.04;                  
+    });
+
+
+  }
 
   // Edge building
   function getSimilaritySettings(){ const fields=[]; if(document.getElementById('simChk-language').checked) fields.push('language'); if(document.getElementById('simChk-project').checked) fields.push('project'); if(document.getElementById('simChk-city').checked) fields.push('city'); if(document.getElementById('simChk-expertise').checked) fields.push('expertise'); if(document.getElementById('simChk-experience').checked) fields.push('experience'); const threshold=(+$th.value)/100; return {fields,threshold}; }
@@ -257,7 +308,6 @@ Edgelands People Network — OVERLAY UI REFACTOR
     const rail = document.getElementById('facetBar');
     if (!rail) return;
     rail.innerHTML = '';
-    // Order matches your facets list
     const defs = [
       {title:'Connection', key:'event'},
       {title:'Edgelands Project', key:'project'},
@@ -272,12 +322,16 @@ Edgelands People Network — OVERLAY UI REFACTOR
       b.textContent = def.title;
       b.dataset.facet = def.key;
       b.onclick = () => {
-        // show Filters overlay, but only the chosen facet inside it
-        $overlayFilters.hidden = false;
+        // show only the chosen facet inside overlay
         $filters.querySelectorAll('.facet').forEach(el => {
           el.style.display = (el.dataset.key === def.key) ? 'block' : 'none';
         });
         $overlayFilters.scrollTop = 0;
+
+        // position overlay near this button
+        // make sure its size is known before positioning
+        $overlayFilters.hidden = false;
+        requestAnimationFrame(() => positionOverlayNearButton(b, $overlayFilters));
       };
       rail.appendChild(b);
     });
@@ -330,7 +384,7 @@ Edgelands People Network — OVERLAY UI REFACTOR
   document.addEventListener('keydown',(e)=>{ if(e.key.toLowerCase()==='l'&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ e.preventDefault(); const expanded=$legendToggle.getAttribute('aria-expanded')==='true'; setLegendVisible(!expanded); } });
 
   // Floating actions
-  function doReset(){ frameToBounds(4.2); selectedIds.clear(); lastClickedIndex=null; for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=document.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } setSearchTerms(''); if($search) $search.value=''; renderPopups(); rebuildLinks($edgeMode.value); renderLegend(nodes,activeIds); }
+  function doReset(){ frameToBounds(2.8); selectedIds.clear(); lastClickedIndex=null; for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=document.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } setSearchTerms(''); if($search) $search.value=''; renderPopups(); rebuildLinks($edgeMode.value); renderLegend(nodes,activeIds); }
   function doClearSel(){ selectedIds.clear(); lastClickedIndex=null; renderPopups(); applyFilters(); }
   document.getElementById('clearFiltersFloating').onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=document.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } setSearchTerms(''); if($search) $search.value=''; applyFilters(); };
   $resetFloating.onclick=doReset; $clearSelFloating.onclick=doClearSel;
@@ -340,6 +394,32 @@ Edgelands People Network — OVERLAY UI REFACTOR
   $th.oninput=()=>{ $thLbl.textContent=$th.value+'%'; rebuildLinks($edgeMode.value); };
   ;['language','project','city','expertise','experience'].forEach(k=>{ document.getElementById('simChk-'+k).onchange=()=>rebuildLinks($edgeMode.value); });
   document.getElementById('nodeColorBy').onchange=()=>{ window.nodeColorMode=$nodeColorBy.value; applyColors(); renderLegend(nodes,activeIds); setLegendVisible(true); };
+
+  function positionOverlayNearButton(btn, panel, align='left') {
+    const rect = btn.getBoundingClientRect();
+    const pad = 10; // small gap from the button
+    // Convert viewport to container coordinates
+    const host = document.getElementById('graph');
+    const hostRect = host.getBoundingClientRect();
+
+    let top  = rect.top  - hostRect.top;
+    let left = rect.left - hostRect.left;
+
+    // place to the right of the button by default
+    left += rect.width + pad;
+    // keep inside the graph bounds if possible
+    const maxLeft = host.clientWidth - panel.offsetWidth - pad;
+    const maxTop  = host.clientHeight - panel.offsetHeight - pad;
+    left = Math.max(pad, Math.min(left, maxLeft));
+    top  = Math.max(pad, Math.min(top,  maxTop));
+
+    panel.classList.add('is-floating');
+    panel.style.left = `${left}px`;
+    panel.style.top  = `${top}px`;
+    panel.hidden = false;
+    panel.focus();
+  }
+
 
   // Init
   buildFacets();
