@@ -158,8 +158,6 @@ Edgelands People Network — OVERLAY UI REFACTOR
     <!-- Nav hint -->
     <div class="navinfo">Left click: rotate · Wheel/middle: zoom · Right click: pan</div>
 
- 
-
   </div>
 
   <!-- Right panel → global search + active list as cards -->
@@ -260,11 +258,7 @@ Edgelands People Network — OVERLAY UI REFACTOR
     const s = typeof l.source==='object'? l.source : nodes.find(n=>n.id===l.source);
     const t = typeof l.target==='object'? l.target : nodes.find(n=>n.id===l.target);
     const sId = s.id, tId = t.id;
-
-    // Highlight only edges touching a selected node
     if (selectedIds.has(sId) || selectedIds.has(tId)) return COL_SELECTED;
-
-    // Unified neutral for everything else (idle AND non-incident during selection)
     return '#bfbfbf';
   }
 
@@ -286,8 +280,6 @@ Edgelands People Network — OVERLAY UI REFACTOR
       if (touchesSel) return 0.9;   
       return 0.04;                  
     });
-
-
   }
 
   // Edge building
@@ -346,9 +338,8 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
   // Active list (right panel) → cards
   function renderCardsList(){ const rowsActive=nodes.filter(n=>activeIds.has(n.id)).sort((a,b)=> (a.last||'').localeCompare(b.last||'') || (a.first||'').localeCompare(b.first||'')); if(!rowsActive.length){ $cardsList.innerHTML='<div class="muted">No people match the current filters.</div>'; return; } $cardsList.innerHTML=rowsActive.map(n=>`<div class="person-card ${selectedIds.has(n.id)?'is-selected':''}" data-id="${n.id}"><div class="pc-name">${[n.first,n.last].filter(Boolean).join(' ')||'(unnamed)'}</div>${n.email?`<div class="pc-row"><a class="pc-email" href="mailto:${n.email}">${n.email}</a></div>`:''}<div class="pc-row">${[n.city,n.event].filter(Boolean).join(' · ')}</div>${n.project?`<div class="pc-row">${n.project}</div>`:''}<div class="pc-tags">${n.language?`Language: ${n.language}`:''}${n.language&&(n.experience||n.expertise)?' · ':''}${n.experience?`Exp: ${n.experience}`:''}${n.experience&&n.expertise?' · ':''}${n.expertise?`Expertise: ${n.expertise}`:''}</div></div>`).join(''); Array.from($cardsList.querySelectorAll('.person-card')).forEach((el)=>{ el.onclick=()=>{ const id=el.getAttribute('data-id'); toggleSelectById(id); }; }); }
-
   function updateCounts(){ const visN=activeIds.size||0; let visE=0; for(const l of links){ const s=typeof l.source==='object'?l.source.id:l.source; const t=typeof l.target==='object'?l.target.id:l.target; if(activeIds.has(s)&&activeIds.has(t)) visE++; } $counts.textContent=`Visible: ${visN} nodes, ${visE} edges`; }
-
+  
   // Filtering/coloring pipeline
   function applyFilters(){ activeIds.clear(); nodes.forEach(n=>{ if(rowPassesFacets(n)&&rowMatchesSearch(n)) activeIds.add(n.id); }); recomputeNeighbors(); renderCardsList(); updateCounts(); applyColors(); renderLegend(nodes,activeIds); }
 
@@ -397,17 +388,15 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
   function positionOverlayNearButton(btn, panel, align='left') {
     const rect = btn.getBoundingClientRect();
-    const pad = 10; // small gap from the button
-    // Convert viewport to container coordinates
+    const pad = 10; 
     const host = document.getElementById('graph');
     const hostRect = host.getBoundingClientRect();
 
     let top  = rect.top  - hostRect.top;
     let left = rect.left - hostRect.left;
 
-    // place to the right of the button by default
     left += rect.width + pad;
-    // keep inside the graph bounds if possible
+
     const maxLeft = host.clientWidth - panel.offsetWidth - pad;
     const maxTop  = host.clientHeight - panel.offsetHeight - pad;
     left = Math.max(pad, Math.min(left, maxLeft));
@@ -420,7 +409,6 @@ Edgelands People Network — OVERLAY UI REFACTOR
     panel.focus();
   }
 
-
   // Init
   buildFacets();
   createFacetBar(); 
@@ -431,4 +419,3 @@ Edgelands People Network — OVERLAY UI REFACTOR
 </script>
 </body>
 </html>
-

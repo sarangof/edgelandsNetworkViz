@@ -134,7 +134,7 @@ a:hover{ text-decoration: underline; }
 .btn--primary{ background: var(--brand-accent); color:#000; }
 .btn--ghost{ background: transparent; color: var(--brand-accent); border-color: var(--brand-accent); }
 
-/* Pills / chips (útil para filtrar por ciudad) */
+/* Pills / chips  */
 .chip{
   display:inline-block; padding:.3rem .6rem; border-radius:999px;
   background: var(--col-primary-300); color:#00312b; font-weight:600; font-size:.8rem;

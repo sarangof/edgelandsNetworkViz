@@ -92,8 +92,6 @@
 
 /* ========== Graph viewport ================================= */
 
-
-
 /* Ensure the embedded canvas always fills its parent */
 #graph > #3d {
   position: absolute;
@@ -516,7 +514,7 @@ tr.selected { background: rgba(217,255,75,.12); }
   z-index: 4;
 }
 
-/* Facet rail (left-center of the main view) */
+/* Facet rail */
 .facet-bar{
   position:absolute;
   left:10px;
@@ -529,7 +527,7 @@ tr.selected { background: rgba(217,255,75,.12); }
   pointer-events:auto;
 }
 
-/* Facet buttons – use Edgelands red so they differ from purple chips */
+/* Facet buttons  */
 .btn-facet{
   border-color: var(--col-accent-red);
   color: var(--col-accent-red);
@@ -545,9 +543,8 @@ tr.selected { background: rgba(217,255,75,.12); }
   #clearFiltersFloating { left: 210px; }
 }
 
-/* Allow JS to place panels anywhere inside #graph */
 .overlay-panel.is-floating{
-  right: auto;   /* override the default right anchoring */
-  left:  0;      /* JS will set exact left/top */
+  right: auto; 
+  left:  0;    
   top:   0;
 }
