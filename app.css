@@ -23,21 +23,26 @@
 .toolbar-floating{ position:absolute; top:10px; left:10px; right:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; z-index:5; pointer-events:none; }
 .toolbar-floating .left-actions, .toolbar-floating .right-actions{ display:flex; gap:8px; pointer-events:auto; }
 .btn-chip{ padding:7px 11px; border-radius:999px; border:1px solid var(--brand-accent,#DAF300); background: rgba(12,12,12,.55); color: var(--brand-accent,#DAF300); font-weight:700; font-size:12px; cursor:pointer; backdrop-filter: blur(4px); }
-.btn-accent{ border-color: var(--col-accent-red); color: var(--col-accent-red); }
+.btn-accent{border-color: var(--col-accent-red);color: var(--col-accent-red);}
+
+
 .btn-filter{ border-color:#a78bfa; color:#a78bfa; }
-/* Facet rail */
-.facet-bar{ position:absolute; left:10px; top:50%; transform: translateY(-50%); display:flex; flex-direction:column; gap:8px; z-index:5; pointer-events:auto; }
-.btn-facet{ border-color: var(--col-accent-red); color: var(--col-accent-red); background: rgba(12,12,12,.55); }
+.btn-facet{border-color: var(--col-accent-red);color: var(--col-accent-red);background: rgba(12,12,12,.55);}
+
+
 
 /* ===== Overlay panels ===== */
 .overlay-panel{ position:absolute; top:54px; right:10px; width:320px; max-height:60%; overflow:auto; background: rgba(10,10,10,.9); border:1px solid rgba(255,255,255,.12); border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); z-index:6; backdrop-filter: blur(6px); }
 .overlay-head{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.12); }
 .overlay-head .title{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#9aa0a6; font-weight:900; }
+
+#overlay-filters .overlay-head .title {display: none;} /* padding: 6px 8px; */
+
+
 .overlay-body{ padding:10px 12px; }
 .overlay-close{ all:unset; cursor:pointer; padding:2px 6px; border-radius:8px; border:1px solid rgba(214,255,79,.6); color:#D6FF4F; font-weight:700; font-size:12px; }
 
 /* ===== Legend + pills (unchanged base) ===== */
-.legend{ position:absolute; bottom:10px; right:10px; width:260px; max-height:calc(50% - 20px); overflow-y:auto; background: rgba(10,10,10,.85); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:8px 10px; font-size:12px; color:#e8e8e8; backdrop-filter: blur(4px); z-index:3; }
 .legend.is-hidden{ opacity:0; pointer-events:none; transform: translateY(6px); transition:.16s ease; }
 .pill{ position:absolute; bottom:10px; right:10px; padding:6px 10px; border-radius:999px; border:1px solid rgba(214,255,79,.9); background: rgba(12,12,12,.6); color:#D6FF4F; font-weight:700; font-size:12px; cursor:pointer; backdrop-filter: blur(4px); z-index:4; }
 #resetFloating{ left:10px; right:auto; } #clearSelFloating{ left:120px; right:auto; } #clearFiltersFloating{ left:230px; right:auto; }
@@ -247,11 +252,13 @@ button {
 /* ========== Facets ========================================= */
 
 .facet {
-  margin-top: 12px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: #121212;
+  margin-top: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
+
+
 
 .facet-header {
   display: flex;
@@ -263,11 +270,67 @@ button {
 
 .facet-header .title { font-size: 13px; font-weight: 700; }
 .facet-header .actions { display: flex; gap: 6px; }
+.facet-header .actions button {font-size: 10px; padding: 4px 8px; border-color: #a78bfa; color: #a78bfa;}
+
+
 
 .facet-body {
   padding: 10px;
-  border-top: 1px solid var(--app-border);
+  border-top: 1px solid rgba(167,139,250,0.4);
 }
+
+
+/* Reduce overlay font & make body scroll properly */
+#overlay-filters .overlay-body {
+  font-size: 12px;
+  max-height: calc(70vh - 80px);
+  overflow-y: auto;
+}
+
+.facet-topology-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  border: 1px solid #a78bfa;              /* purple border */
+  border-radius: 8px;
+  background: rgba(35,20,75,0.9);         /* subtle purple panel */
+}
+
+/* Include in topology label */
+.facet-topology-bar .label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--app-text, #e5e5e5);        /* same as other fonts */
+  white-space: nowrap;
+}
+
+/* Slider small + narrow */
+.facet-topology-bar input[type="range"] {
+  width: 60px;
+  accent-color: #a78bfa;                  /* purple slider */
+}
+
+/* On/Off pill */
+.facet-topology-bar .state {
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #a78bfa;
+  color: #a78bfa;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+
+/* Shrink the facet list fonts */
+.facet-list {
+  font-size: 11px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
 
 .facet-list {
   max-height: 160px;
@@ -381,10 +444,10 @@ tr.selected { background: rgba(217,255,75,.12); }
 
 .legend {
   position: absolute;
-  top: auto;
-  left: auto;
-  bottom: 10px;
-  right: 10px;
+  top: 10px;        /* was top: auto; */
+  right: 10px;      /* keep */
+  bottom: auto;     /* was bottom: 10px; */
+  left: auto;       /* keep */
   width: 260px;
   max-height: calc(50% - 20px);
   overflow-y: auto;
@@ -397,6 +460,7 @@ tr.selected { background: rgba(217,255,75,.12); }
   backdrop-filter: blur(4px);
   z-index: 3;
 }
+
 
 .legend h3 {
   margin: 0 0 6px;
@@ -435,9 +499,35 @@ tr.selected { background: rgba(217,255,75,.12); }
 .legend.is-shown + #legendToggle { display: none; }
 
 .legend-head {
+  margin-bottom: 4px;
+}
+
+.legend-title {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #9aa0a6;
+}
+
+/* Color-by subsection */
+.legend-color-by {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.legend-label {
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #9aa0a6;
+}
+
+.legend select#nodeColorBy {
+  width: 100%;
+  font-size: 11px;
 }
 
 .legend-head h3 {
@@ -514,25 +604,36 @@ tr.selected { background: rgba(217,255,75,.12); }
   z-index: 4;
 }
 
-/* Facet rail */
-.facet-bar{
-  position:absolute;
-  left:10px;
-  top:50%;
-  transform: translateY(-50%);
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  z-index:5;
-  pointer-events:auto;
+
+  /* Bottom-center facet buttons, in a row */
+.facet-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    flex-wrap: wrap;        /* allows wrapping on small screens */
+    justify-content: center;
+    align-items: center;
+    z-index: 20;
 }
+
+.facet-bar .btn-facet {
+  flex: 0 0 auto;    /* do not stretch */
+  white-space: nowrap;
+}
+
 
 /* Facet buttons  */
 .btn-facet{
-  border-color: var(--col-accent-red);
-  color: var(--col-accent-red);
+  border-color: var(--brand-accent, #DAF300);
+  color: var(--brand-accent, #DAF300);
   background: rgba(12,12,12,.55);
 }
+
+
 
 /* ========== Responsive adjustments ========================= */
 
@@ -544,7 +645,62 @@ tr.selected { background: rgba(217,255,75,.12); }
 }
 
 .overlay-panel.is-floating{
-  right: auto; 
-  left:  0;    
+  right: auto;
+  left:  0;
   top:   0;
+  width: 260px;          
+  max-height: 55%;       
 }
+
+
+/* Threshold control bottom-right */
+.threshold-box {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 0.78rem;
+}
+
+.threshold-box input[type="range"] {
+  width: 80px;        /* shorter slider */
+}
+
+
+/* More compact person cards */
+.person-card {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+}
+
+.person-card .pc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.person-card .pc-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.pc-email-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.person-card .pc-row,
+.person-card .pc-tags {
+  font-size: 0.78rem;
+}
+

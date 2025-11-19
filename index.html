@@ -17,7 +17,7 @@ Edgelands People Network — OVERLAY UI REFACTOR
   <script src="https://unpkg.com/3d-force-graph"></script>
   <script>
   const CSV_DEFAULT_PATH='database_Sep10.csv';
-  const HEADER_MAP={"event/ connection":"event","connection":"event","last name":"last","first name":"first","email":"email","edgelands project":"project","language":"language","edgelands experience":"experience","expertise":"expertise","city":"city"};
+  const HEADER_MAP={"event/ connection":"event","connection":"event","last name":"last","first name":"first","email":"email","Project":"project","language":"language","Experience":"experience","expertise":"expertise","city":"city"};
   const TOKEN_SPLIT=/[,;/|·]+/;
   const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+|\/+ /g,' ');
 
@@ -53,7 +53,7 @@ Edgelands People Network — OVERLAY UI REFACTOR
   function firstToken(v){ return (v||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)[0] || '' }
   function primaryKeyForMode(n, mode){ switch (mode){ case 'city':return (n.city||'').trim(); case 'event':return (n.event||'').trim(); case 'project':return firstToken(n.project); case 'language':return firstToken(n.language); case 'experience':return firstToken(n.experience); case 'expertise':return firstToken(n.expertise); default:return ''; } }
   function colorForNodeKeyByMode(key){ switch (nodeColorMode){ case 'city':return cityTokenColor(key)||getBrandColor(key,'fallback'); case 'project':return getBrandColor(firstToken(key),'project'); case 'language':return getBrandColor(firstToken(key),'language'); case 'event':return getBrandColor(key,'event'); case 'experience':return getBrandColor(firstToken(key),'experience'); case 'expertise':return getBrandColor(firstToken(key),'expertise'); default:return COL_NODE_DEFAULT; } }
-  function titleForMode(){ switch (nodeColorMode){ case 'city':return 'Nodes colored by: City'; case 'project':return 'Nodes colored by: Edgelands Project'; case 'language':return 'Nodes colored by: Language'; case 'event':return 'Nodes colored by: Connection'; case 'experience':return 'Nodes colored by: Edgelands Experience'; case 'expertise':return 'Nodes colored by: Expertise'; default:return 'Nodes colored by: None'; } }
+  function titleForMode(){ switch (nodeColorMode){ case 'city':return 'Nodes colored by: City'; case 'project':return 'Nodes colored by: Project'; case 'language':return 'Nodes colored by: Language'; case 'event':return 'Nodes colored by: Connection'; case 'experience':return 'Nodes colored by: Experience'; case 'expertise':return 'Nodes colored by: Expertise'; default:return 'Nodes colored by: None'; } }
   function facetKeyForColorMode(mode){ switch (mode){ case 'city':return 'city'; case 'project':return 'project'; case 'language':return 'language'; case 'event':return 'event'; case 'experience':return 'experience'; case 'expertise':return 'expertise'; default:return null; } }
   const LEGEND_MAX=5;
 
@@ -67,9 +67,63 @@ Edgelands People Network — OVERLAY UI REFACTOR
   function currentFacetSelection(facetKey){ const wrap=document.querySelector(`.facet[data-key="${facetKey}"]`); const sel=new Set(); if(!wrap) return sel; wrap.querySelectorAll('input[type="checkbox"]:checked').forEach(cb=>sel.add(cb.value)); return sel; }
   function legendRowIsChecked(facetKey, valueOrValues){ const sel=currentFacetSelection(facetKey); if(Array.isArray(valueOrValues)){ return valueOrValues.every(v=>sel.has(v)); } return sel.has(valueOrValues); }
   function setFacetValuesChecked(facetKey, values, checked){ const wrap=document.querySelector(`.facet[data-key="${facetKey}"]`); if(!wrap) return; const valueSet=new Set(values); wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>{ if(!valueSet.has(cb.value)) return; const willChange=cb.checked!==!!checked; cb.checked=!!checked; if(willChange) cb.dispatchEvent(new Event('change',{bubbles:true})); }); }
-  function renderLegend(nodes, activeIds){ const box=document.getElementById('legend'); if(!box) return; const facetKey=facetKeyForColorMode(nodeColorMode); const buckets=legendBuckets(nodes,activeIds); const room=Math.max(0,LEGEND_MAX); const showCount=Math.max(0,room-1); const showRows=buckets.slice(0,showCount); const otherRows=buckets.slice(showCount); const rowsHTML=showRows.map(b=>`<div class="row legend-item" data-key="${b.key}" style="cursor:pointer;"><span class="swatch" style="background:${b.color}"></span><span>${b.label}</span><span class="meta">${b.countVis}/${b.countAll}</span></div>`).join(''); const otherCount=otherRows.reduce((s,r)=>s+(r.countAll||0),0); const otherKeys=otherRows.map(r=>r.key); const otherHTML=otherRows.length?(()=>{ const checked=legendRowIsChecked(facetKey,otherKeys); return `<div class="row legend-item" data-other="1" data-keys='${JSON.stringify(otherKeys)}' style="cursor:pointer;"><span class="swatch" style="background:rgba(150,150,150,.6)"></span><span>Other</span><span class="meta">${otherCount}</span></div>`; })():''; box.innerHTML=`<div class="legend-head"><h3>${titleForMode()}</h3><button class="legend-close" aria-label="Close legend">×</button></div>${rowsHTML}${otherHTML}`; box.querySelector('.legend-close')?.addEventListener('click',(e)=>{e.stopPropagation(); setLegendVisible(false);}); box.querySelectorAll('.legend-item').forEach(row=>{ row.addEventListener('click',()=>{ const isOther=row.hasAttribute('data-other'); const values=isOther?JSON.parse(row.getAttribute('data-keys')||'[]'):[row.getAttribute('data-key')]; const facet=facetKeyForColorMode(nodeColorMode); if(!facet||values.length===0) return; const currentlyChecked=legendRowIsChecked(facet,values); setFacetValuesChecked(facet,values,!currentlyChecked); }); }); }
-  function setLegendVisible(v){ const box=document.getElementById('legend'); const btn=document.getElementById('legendToggle'); if(!box||!btn) return; box.classList.toggle('is-hidden',!v); box.classList.toggle('is-shown',!!v); btn.setAttribute('aria-expanded',String(!!v)); localStorage.setItem('legend:visible',String(!!v)); }
-  function getLegendInitialVisibility(){ const saved=localStorage.getItem('legend:visible'); if(saved!==null) return saved==='true'; return false; }
+  function renderLegend(nodes, activeIds){
+    const body = document.getElementById('legendBody');
+    if (!body) return;
+
+    const facetKey = facetKeyForColorMode(nodeColorMode);
+    const buckets = legendBuckets(nodes, activeIds);
+
+    const room = Math.max(0, LEGEND_MAX);
+    const showCount = Math.max(0, room - 1);
+    const showRows = buckets.slice(0, showCount);
+    const otherRows = buckets.slice(showCount);
+
+    const rowsHTML = showRows.map(b => `
+      <div class="row legend-item" data-key="${b.key}" style="cursor:pointer;">
+        <span class="swatch" style="background:${b.color}"></span>
+        <span>${b.label}</span>
+        <span class="meta">${b.countVis}/${b.countAll}</span>
+      </div>
+    `).join('');
+
+    const otherCount = otherRows.reduce((s, r) => s + (r.countAll || 0), 0);
+    const otherKeys = otherRows.map(r => r.key);
+    const otherHTML = otherRows.length ? (() => {
+      const checked = legendRowIsChecked(facetKey, otherKeys);
+      return `
+        <div class="row legend-item" data-other="1" data-keys='${JSON.stringify(otherKeys)}' style="cursor:pointer;">
+          <span class="swatch" style="background:rgba(150,150,150,.6)"></span>
+          <span>Other</span>
+          <span class="meta">${otherCount}</span>
+        </div>
+      `;
+    })() : '';
+
+    body.innerHTML = rowsHTML + otherHTML;
+
+    body.querySelectorAll('.legend-item').forEach(row => {
+      row.addEventListener('click', () => {
+        const isOther = row.hasAttribute('data-other');
+        const values = isOther
+          ? JSON.parse(row.getAttribute('data-keys') || '[]')
+          : [row.getAttribute('data-key')];
+        const facet = facetKeyForColorMode(nodeColorMode);
+        if (!facet || values.length === 0) return;
+        const currentlyChecked = legendRowIsChecked(facet, values);
+        setFacetValuesChecked(facet, values, !currentlyChecked);
+      });
+    });
+  }
+
+  function setLegendVisible(v){
+    const box = document.getElementById('legend');
+    if (!box) return;
+    box.classList.toggle('is-hidden', !v);
+    box.classList.toggle('is-shown', !!v);
+  }
+
+
   </script>
 </head>
 
@@ -82,40 +136,24 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
     <!-- Floating toolbar (top) -->
     <div id="topToolbar" class="toolbar-floating">
-      <div class="left-actions">
-        <button id="randomViewBtn" class="btn-chip btn-accent">Random view</button>
-        <button id="defaultViewBtn" class="btn-chip btn-accent">Default view</button>
-      </div>
-    <div class="right-actions">
-      <button class="btn-chip btn-filter" data-open="coloring">Coloring</button>
-      <button class="btn-chip btn-filter" data-open="edges">Edges</button>
+    <div class="left-actions">
+      <button id="randomViewBtn" class="btn-chip btn-accent">Random view</button>
+      <button id="defaultViewBtn" class="btn-chip btn-accent">Default view</button>
+      <button id="resetBtn" class="btn-chip btn-accent">Reset</button>
     </div>
+    <!-- top-right buttons removed; legend will live there visually -->
+    <div class="right-actions"></div>
+
 
     </div>
 
     <!-- Overlay panels for controls -->
     <div id="overlay-filters" class="overlay-panel" hidden>
-      <div class="overlay-head"><div class="title">Filters</div><button class="overlay-close" data-close>×</button></div>
       <div class="overlay-body">
         <div id="filters"></div>
       </div>
     </div>
 
-    <div id="overlay-coloring" class="overlay-panel" hidden>
-      <div class="overlay-head"><div class="title">Coloring</div><button class="overlay-close" data-close>×</button></div>
-      <div class="overlay-body">
-        <label style="margin-top:0">Node color by</label>
-        <select id="nodeColorBy">
-          <option value="city" selected>City</option>
-          <option value="project">Edgelands Project</option>
-          <option value="language">Language</option>
-          <option value="event">Connection</option>
-          <option value="experience">Edgelands Experience</option>
-          <option value="expertise">Expertise</option>
-          <option value="none">None (single)</option>
-        </select>
-      </div>
-    </div>
 
     <div id="overlay-edges" class="overlay-panel" hidden>
       <div class="overlay-head"><div class="title">Edges</div><button class="overlay-close" data-close>×</button></div>
@@ -128,15 +166,16 @@ Edgelands People Network — OVERLAY UI REFACTOR
         <div id="simOptions" style="margin-top:10px">
           <div class="muted" style="margin-bottom:6px">Similarity fields (check to include)</div>
           <label class="row"><input type="checkbox" id="simChk-language"><span>Language</span></label>
-          <label class="row"><input type="checkbox" id="simChk-project" checked><span>Edgelands Project</span></label>
+          <label class="row"><input type="checkbox" id="simChk-project" checked><span>Project</span></label>
           <label class="row"><input type="checkbox" id="simChk-city"><span>City</span></label>
           <label class="row"><input type="checkbox" id="simChk-expertise"><span>Expertise</span></label>
-          <label class="row"><input type="checkbox" id="simChk-experience"><span>Edgelands Experience</span></label>
+          <label class="row"><input type="checkbox" id="simChk-experience"><span>Experience</span></label>
           <div class="row" style="align-items:center; gap:12px; margin-top:12px">
             <label style="margin:0; min-width:110px">Threshold</label>
-            <input type="range" id="simThreshold" min="0" max="100" step="5" value="10">
-            <div id="simThresholdLabel" style="width:40px; text-align:right">10%</div>
+              <input type="range" id="simThresholdOverlay" min="0" max="100" step="5" value="15">
+              <div id="simThresholdLabelOverlay" style="width:40px; text-align:right">15%</div>
           </div>
+
         </div>
       </div>
     </div>
@@ -145,12 +184,35 @@ Edgelands People Network — OVERLAY UI REFACTOR
     <div id="facetBar" class="facet-bar"></div>
 
     <!-- Legend & floating actions -->
-    <div id="legend" class="legend"></div>
-    <button id="legendToggle" class="pill" aria-expanded="false" aria-controls="legend">Legend</button>
+  <div id="legend" class="legend">
+    <div class="legend-color-by">
+      <label for="nodeColorBy" class="legend-label">Node color by</label>
+      <select id="nodeColorBy">
+        <option value="city" selected>City</option>
+        <option value="project">Project</option>
+        <option value="language">Language</option>
+        <option value="event">Connection</option>
+        <option value="experience">Experience</option>
+        <option value="expertise">Expertise</option>
+        <option value="none">None (single)</option>
+      </select>
+    </div>
 
-    <button id="resetFloating" class="pill">Reset view</button>
-    <button id="clearSelFloating" class="pill">Clear selection</button>
-    <button id="clearFiltersFloating" class="pill">Clear filters</button>
+    <div class="legend-head">
+      <div class="legend-title">Legend</div>
+    </div>
+
+    <div id="legendBody" class="legend-body"></div>
+  </div>
+
+
+
+  <div id="thresholdControl" class="threshold-box">
+    <label for="simThreshold" class="muted" style="margin-right:6px;">Edge threshold</label>
+    <input type="range" id="simThreshold" min="0" max="100" step="5" value="10">
+    <span id="simThresholdLabel" style="margin-left:6px;">15%</span>
+  </div>
+
 
     <!-- Selection popups near nodes -->
     <div id="nodePopups" class="popups-layer"></div>
@@ -162,7 +224,6 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
   <!-- Right panel → global search + active list as cards -->
   <div id="right" class="panel">
-    <div class="frame-title">People</div>
     <div class="row" id="global-search-row" style="gap:8px; align-items:center; margin:8px 0">
       <input id="globalSearch" type="search" placeholder="Search all fields (e.g., Nairobi, data...)" style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:8px; min-width:180px">
       <button id="clearSearch" type="button" title="Clear" style="padding:6px 10px; border:1px solid #ccc; border-radius:8px; background:#f7f7f7">×</button>
@@ -185,9 +246,7 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
   // DOM refs
   const $graphWrap=document.getElementById('graph');
-  const $legendToggle=document.getElementById('legendToggle');
-  const $resetFloating=document.getElementById('resetFloating');
-  const $clearSelFloating=document.getElementById('clearSelFloating');
+  const $resetBtn = document.getElementById('resetBtn');
   const $cardsList=document.getElementById('cardsList');
   const $counts=document.getElementById('counts');
   const $search=document.getElementById('globalSearch');
@@ -205,7 +264,21 @@ Edgelands People Network — OVERLAY UI REFACTOR
   const $thLbl=document.getElementById('simThresholdLabel'); $thLbl.textContent=$th.value+'%';
 
   // Token sets for OR facets and similarity
-  const tokenFacetKeys=new Set(['language','experience','expertise','project']);
+  const tokenFacetKeys = new Set(['language', 'experience', 'expertise', 'project', 'event']);
+
+  // Which facet fields participate in similarity (network topology)
+  // Landing view = project + experience + expertise (no language, no city, no event)
+  const similarityFieldsState = {
+    event: false,
+    project: true,
+    language: false,
+    experience: true,
+    expertise: true,
+    city: false
+  };
+
+
+
   const nodeTokens={}; nodes.forEach(n=>{ nodeTokens[n.id]={}; for(const k of tokenFacetKeys){ nodeTokens[n.id][k]=new Set((n[k]||'').split(TOKEN_SPLIT).map(s=>s.trim()).filter(Boolean)); } });
 
   // 3D graph
@@ -218,7 +291,17 @@ Edgelands People Network — OVERLAY UI REFACTOR
     .linkOpacity(0.18)
     .backgroundColor(getComputedStyle(document.body).getPropertyValue('--graph-background').trim()||'#0b0b0b')
     .onNodeClick(n=>toggleSelectById(n.id));
-  world.onBackgroundClick(()=>{ selectedIds.clear(); lastClickedIndex=null; renderPopups(); applyFilters(); });
+  world.onBackgroundClick(()=>{
+    selectedIds.clear();
+    lastClickedIndex = null;
+    renderPopups();
+    applyFilters();
+
+    // also close any open facet overlay
+    $overlayFilters.hidden = true;
+    openFacetKey = null;
+  });
+
   world.showNavInfo(false);
 
   // Gentle continuous rotation
@@ -283,18 +366,115 @@ Edgelands People Network — OVERLAY UI REFACTOR
   }
 
   // Edge building
-  function getSimilaritySettings(){ const fields=[]; if(document.getElementById('simChk-language').checked) fields.push('language'); if(document.getElementById('simChk-project').checked) fields.push('project'); if(document.getElementById('simChk-city').checked) fields.push('city'); if(document.getElementById('simChk-expertise').checked) fields.push('expertise'); if(document.getElementById('simChk-experience').checked) fields.push('experience'); const threshold=(+$th.value)/100; return {fields,threshold}; }
+  function getSimilaritySettings(){
+    const fields = [];
+    for (const [key, on] of Object.entries(similarityFieldsState)) {if (on) fields.push(key);}
+    const threshold = (+$th.value) / 100;
+    return { fields, threshold };
+  }
+
   function jaccard(aSet,bSet){ if(!aSet.size&&!bSet.size) return NaN; let inter=0; if(aSet.size<bSet.size){ aSet.forEach(v=>{ if(bSet.has(v)) inter++; }); } else { bSet.forEach(v=>{ if(aSet.has(v)) inter++; }); } const union=new Set([...aSet,...bSet]).size; return union?inter/union:NaN; }
   function pairSimilarity(a,b,fields){ const scores=[]; for(const f of fields){ if(f==='city'){ const va=(a.city||'').trim(), vb=(b.city||'').trim(); if(va===''&&vb==='') continue; scores.push(va&&vb?(va===vb?1:0):0); } else { const A=nodeTokens[a.id][f]||new Set(), B=nodeTokens[b.id][f]||new Set(); const s=jaccard(A,B); if(!Number.isNaN(s)) scores.push(s); } } if(!scores.length) return 0; return scores.reduce((x,y)=>x+y,0)/scores.length; }
   function rebuildLinks(mode){ links=[]; if(mode==='random'){ const ids=nodes.map(n=>n.id); const m=Math.min(ids.length*2,600), used=new Set(); while(used.size<m){ const s=ids[Math.floor(Math.random()*ids.length)], t=ids[Math.floor(Math.random()*ids.length)]; if(s===t) continue; const key=s<t?`${s}|${t}`:`${t}|${s}`; if(!used.has(key)){ used.add(key); links.push({source:s,target:t,kind:'random'}) } } world.graphData({nodes,links}); applyFilters(); return; } const {fields,threshold}=getSimilaritySettings(); if(!fields.length){ world.graphData({nodes,links}); applyFilters(); return; } for(let i=0;i<nodes.length;i++){ for(let j=i+1;j<nodes.length;j++){ const a=nodes[i], b=nodes[j]; const score=pairSimilarity(a,b,fields); if(score>=threshold){ links.push({source:a.id,target:b.id,kind:'sim',score}); } } } world.graphData({nodes,links}); applyFilters(); }
 
   // Facets → moved into overlay
-  const facetDefs=[ {title:'Connection', key:'event', tokenized:false}, {title:'Edgelands Project', key:'project', tokenized:true}, {title:'Language', key:'language', tokenized:true}, {title:'Edgelands Experience', key:'experience', tokenized:true}, {title:'Expertise', key:'expertise', tokenized:true}, {title:'City', key:'city', tokenized:false}, ];
+  const facetDefs=[ {title:'Connection', key:'event', tokenized:false}, {title:'Project', key:'project', tokenized:true}, {title:'Language', key:'language', tokenized:true}, {title:'Experience', key:'experience', tokenized:true}, {title:'Expertise', key:'expertise', tokenized:true}, {title:'City', key:'city', tokenized:false}, ];
   const selectedFacets=Object.fromEntries(facetDefs.map(f=>[f.key,new Set()]));
   function uniqueSortedValues(def){ const {key,tokenized}=def, values=new Set(); nodes.forEach(n=>{ const raw=(n[key]||'').trim(); if(!raw) return; if(tokenized) raw.split(TOKEN_SPLIT).forEach(p=>{ const t=p.trim(); if(t) values.add(t); }); else values.add(raw); }); return [...values].sort((a,b)=>a.localeCompare(b)); }
-  function makeFacet(def){ const values=uniqueSortedValues(def); const wrap=document.createElement('div'); wrap.className='facet'; wrap.dataset.key=def.key; const header=document.createElement('div'); header.className='facet-header'; const title=document.createElement('div'); title.className='title'; title.textContent=def.title; const actions=document.createElement('div'); actions.className='actions'; const aAll=document.createElement('button'); aAll.type='button'; aAll.textContent='Select all'; const aClr=document.createElement('button'); aClr.type='button'; aClr.textContent='Clear'; actions.append(aAll,aClr); header.append(title,actions); const body=document.createElement('div'); body.className='facet-body'; const list=document.createElement('div'); list.className='facet-list'; values.forEach(v=>{ const id=`chk-${def.key}-${v.replace(/[^a-z0-9]+/gi,'').toLowerCase()}`; const row=document.createElement('label'); row.className='facet-item'; row.title=v; row.innerHTML=`<input type="checkbox" value="${v}" id="${id}"><span>${v}</span>`; list.appendChild(row); }); body.appendChild(list); wrap.append(header,body); $filters.appendChild(wrap); list.addEventListener('change',e=>{ if(e.target&&e.target.type==='checkbox'){ const val=e.target.value; if(e.target.checked) selectedFacets[def.key].add(val); else selectedFacets[def.key].delete(val); applyFilters(); }}); aAll.onclick=()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(cb=>{ cb.checked=true; selectedFacets[def.key].add(cb.value); }); applyFilters(); }; aClr.onclick=()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); selectedFacets[def.key].clear(); applyFilters(); } }
+    
+  function makeFacet(def){ 
+    const values = uniqueSortedValues(def);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'facet';
+    wrap.dataset.key = def.key;
+
+    // --- Topology sub-pane (green bar) ---
+    const topoBar = document.createElement('div');
+    topoBar.className = 'facet-topology-bar';
+    topoBar.innerHTML = `
+      <div class="label">Include in topology</div>
+      <input type="range" min="0" max="1" step="1"
+            value="${similarityFieldsState[def.key] ? '1' : '0'}">
+      <div class="state">${similarityFieldsState[def.key] ? 'On' : 'Off'}</div>
+    `;
+    const sliderInput = topoBar.querySelector('input');
+    const stateBox = topoBar.querySelector('.state');
+    sliderInput.addEventListener('input', () => {
+      const on = sliderInput.value === '1';
+      similarityFieldsState[def.key] = on;
+      stateBox.textContent = on ? 'On' : 'Off';
+      rebuildLinks($edgeMode.value);
+    });
+
+    // --- Header row with facet name + Select all / Clear ---
+    const header = document.createElement('div');
+    header.className = 'facet-header';
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = def.title;
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const aAll = document.createElement('button');
+    aAll.type = 'button';
+    aAll.textContent = 'Select all';
+    const aClr = document.createElement('button');
+    aClr.type = 'button';
+    aClr.textContent = 'Clear';
+    actions.append(aAll, aClr);
+    header.append(title, actions);
+
+    // --- Body with scrollable checkbox list ---
+    const body = document.createElement('div');
+    body.className = 'facet-body';
+    const list = document.createElement('div');
+    list.className = 'facet-list';
+    values.forEach(v => {
+      const id = `chk-${def.key}-${v.replace(/[^a-z0-9]+/gi,'').toLowerCase()}`;
+      const row = document.createElement('label');
+      row.className = 'facet-item';
+      row.title = v;
+      row.innerHTML = `<input type="checkbox" value="${v}" id="${id}"><span>${v}</span>`;
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+
+    // Order: topology bar (top) → header → body
+    wrap.append(topoBar, header, body);
+    $filters.appendChild(wrap);
+
+    // Events
+    list.addEventListener('change', e => {
+      if (e.target && e.target.type === 'checkbox') {
+        const val = e.target.value;
+        if (e.target.checked) selectedFacets[def.key].add(val);
+        else selectedFacets[def.key].delete(val);
+        applyFilters();
+      }
+    });
+
+    aAll.onclick = () => {
+      list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = true;
+        selectedFacets[def.key].add(cb.value);
+      });
+      applyFilters();
+    };
+
+    aClr.onclick = () => {
+      list.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      selectedFacets[def.key].clear();
+      applyFilters();
+    };
+  }
+
+
+
   function buildFacets(){ $filters.innerHTML=''; facetDefs.forEach(makeFacet); }
   function rowPassesFacets(n){ for(const def of facetDefs){ const sel=selectedFacets[def.key]; if(sel.size===0) continue; if(def.tokenized){ const toks=nodeTokens[n.id][def.key]||new Set(); let hit=false; for(const w of sel){ if(toks.has(w)){ hit=true; break; } } if(!hit) return false; } else { const val=(n[def.key]||'').trim(); if(!sel.has(val)) return false; } } return true; }
+
+  let openFacetKey = null;
+
 
   function createFacetBar(){
     const rail = document.getElementById('facetBar');
@@ -302,9 +482,9 @@ Edgelands People Network — OVERLAY UI REFACTOR
     rail.innerHTML = '';
     const defs = [
       {title:'Connection', key:'event'},
-      {title:'Edgelands Project', key:'project'},
+      {title:'Project', key:'project'},
       {title:'Language', key:'language'},
-      {title:'Edgelands Experience', key:'experience'},
+      {title:'Experience', key:'experience'},
       {title:'Expertise', key:'expertise'},
       {title:'City', key:'city'}
     ];
@@ -314,20 +494,43 @@ Edgelands People Network — OVERLAY UI REFACTOR
       b.textContent = def.title;
       b.dataset.facet = def.key;
       b.onclick = () => {
-        // show only the chosen facet inside overlay
+        // If this facet is already open → close
+        if (! $overlayFilters.hidden && openFacetKey === def.key) {
+          $overlayFilters.hidden = true;
+          openFacetKey = null;
+          return;
+        }
+
+        // Show only the chosen facet inside overlay
         $filters.querySelectorAll('.facet').forEach(el => {
           el.style.display = (el.dataset.key === def.key) ? 'block' : 'none';
         });
         $overlayFilters.scrollTop = 0;
 
-        // position overlay near this button
-        // make sure its size is known before positioning
+        // Mark as open and position near the button
         $overlayFilters.hidden = false;
+        openFacetKey = def.key;
         requestAnimationFrame(() => positionOverlayNearButton(b, $overlayFilters));
       };
       rail.appendChild(b);
     });
   }
+
+
+  // Close facet overlay when clicking outside the overlay or facet buttons
+  document.addEventListener('click', (e) => {
+    if ($overlayFilters.hidden) return;
+
+    const insideOverlay = e.target.closest('#overlay-filters');
+    const facetBtn      = e.target.closest('.btn-facet');
+
+    if (!insideOverlay && !facetBtn) {
+      $overlayFilters.hidden = true;
+      openFacetKey = null;
+    }
+  });
+
+
 
   // Search
   let searchTerms=[]; function setSearchTerms(val){ searchTerms=String(val||'').toLowerCase().trim().split(/\s+/).filter(Boolean); }
@@ -337,7 +540,72 @@ Edgelands People Network — OVERLAY UI REFACTOR
   $clearSearch?.addEventListener('click',()=>{ $search.value=''; setSearchTerms(''); applyFilters(); });
 
   // Active list (right panel) → cards
-  function renderCardsList(){ const rowsActive=nodes.filter(n=>activeIds.has(n.id)).sort((a,b)=> (a.last||'').localeCompare(b.last||'') || (a.first||'').localeCompare(b.first||'')); if(!rowsActive.length){ $cardsList.innerHTML='<div class="muted">No people match the current filters.</div>'; return; } $cardsList.innerHTML=rowsActive.map(n=>`<div class="person-card ${selectedIds.has(n.id)?'is-selected':''}" data-id="${n.id}"><div class="pc-name">${[n.first,n.last].filter(Boolean).join(' ')||'(unnamed)'}</div>${n.email?`<div class="pc-row"><a class="pc-email" href="mailto:${n.email}">${n.email}</a></div>`:''}<div class="pc-row">${[n.city,n.event].filter(Boolean).join(' · ')}</div>${n.project?`<div class="pc-row">${n.project}</div>`:''}<div class="pc-tags">${n.language?`Language: ${n.language}`:''}${n.language&&(n.experience||n.expertise)?' · ':''}${n.experience?`Exp: ${n.experience}`:''}${n.experience&&n.expertise?' · ':''}${n.expertise?`Expertise: ${n.expertise}`:''}</div></div>`).join(''); Array.from($cardsList.querySelectorAll('.person-card')).forEach((el)=>{ el.onclick=()=>{ const id=el.getAttribute('data-id'); toggleSelectById(id); }; }); }
+  
+    function renderCardsList(){
+      // If there is a selection, show only selected nodes.
+      // Otherwise, show all active nodes.
+      const base = selectedIds.size
+        ? nodes.filter(n => selectedIds.has(n.id))
+        : nodes.filter(n => activeIds.has(n.id));
+
+      const rowsActive = base
+        .sort((a,b) =>
+          (a.last||'').localeCompare(b.last||'') ||
+          (a.first||'').localeCompare(b.first||'')
+        );
+
+      if (!rowsActive.length){
+        $cardsList.innerHTML = '<div class="muted">No people match the current filters.</div>';
+        return;
+      }
+
+      $cardsList.innerHTML = rowsActive.map(n => {
+        const name = [n.first, n.last].filter(Boolean).join(' ') || '(unnamed)';
+        const cityTag = n.city ? ` (${n.city})` : '';
+        const header = `
+          <div class="pc-header">
+            <div class="pc-name">${name}${cityTag}</div>
+            ${n.email ? `<button class="pc-email-btn" data-email="${n.email}" title="Email ${name}">✉</button>` : ''}
+          </div>
+        `;
+
+
+      const lineAffLangExpParts = [];
+      if (n.project) lineAffLangExpParts.push(`Project: ${n.project}`);
+      if (n.language) lineAffLangExpParts.push(`Lang: ${n.language}`);
+      if (n.experience) lineAffLangExpParts.push(`Exp: ${n.experience}`);
+
+      const lineAffLangExp = lineAffLangExpParts.join(' · ');
+      const expertiseText = n.expertise ? `Expertise: ${n.expertise}` : '';
+
+      return `
+        <div class="person-card ${selectedIds.has(n.id) ? 'is-selected' : ''}" data-id="${n.id}">
+          ${header}
+          ${lineAffLangExp ? `<div class="pc-row">${lineAffLangExp}</div>` : ''}
+          ${expertiseText ? `<div class="pc-tags">${expertiseText}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Click to select person
+    Array.from($cardsList.querySelectorAll('.person-card')).forEach(el => {
+      el.onclick = () => {
+        const id = el.getAttribute('data-id');
+        toggleSelectById(id);
+      };
+    });
+
+    // Email button: open mailto without toggling selection
+    Array.from($cardsList.querySelectorAll('.pc-email-btn')).forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const email = btn.getAttribute('data-email');
+        if (email) window.location.href = `mailto:${email}`;
+      });
+    });
+  }
+
+  
   function updateCounts(){ const visN=activeIds.size||0; let visE=0; for(const l of links){ const s=typeof l.source==='object'?l.source.id:l.source; const t=typeof l.target==='object'?l.target.id:l.target; if(activeIds.has(s)&&activeIds.has(t)) visE++; } $counts.textContent=`Visible: ${visN} nodes, ${visE} edges`; }
   
   // Filtering/coloring pipeline
@@ -370,52 +638,94 @@ Edgelands People Network — OVERLAY UI REFACTOR
   document.getElementById('randomViewBtn').addEventListener('click',()=>{ $edgeMode.value='random'; $edgeMode.dispatchEvent(new Event('change')); });
   document.getElementById('defaultViewBtn').addEventListener('click',()=>{ $edgeMode.value='similarity'; $edgeMode.dispatchEvent(new Event('change')); });
 
-  // Legend pill + keyboard
-  $legendToggle.onclick=()=>{ const expanded=$legendToggle.getAttribute('aria-expanded')==='true'; setLegendVisible(!expanded); };
-  document.addEventListener('keydown',(e)=>{ if(e.key.toLowerCase()==='l'&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ e.preventDefault(); const expanded=$legendToggle.getAttribute('aria-expanded')==='true'; setLegendVisible(!expanded); } });
-
   // Floating actions
-  function doReset(){ frameToBounds(2.8); selectedIds.clear(); lastClickedIndex=null; for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=document.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } setSearchTerms(''); if($search) $search.value=''; renderPopups(); rebuildLinks($edgeMode.value); renderLegend(nodes,activeIds); }
-  function doClearSel(){ selectedIds.clear(); lastClickedIndex=null; renderPopups(); applyFilters(); }
-  document.getElementById('clearFiltersFloating').onclick=()=>{ for(const def of facetDefs){ selectedFacets[def.key].clear(); const wrap=document.querySelector(`.facet[data-key="${def.key}"]`); if(wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false); } setSearchTerms(''); if($search) $search.value=''; applyFilters(); };
-  $resetFloating.onclick=doReset; $clearSelFloating.onclick=doClearSel;
+  function doReset(){
+    frameToBounds(2.8);
+    selectedIds.clear();
+    lastClickedIndex = null;
+
+    // clear facet selections
+    for (const def of facetDefs){
+      selectedFacets[def.key].clear();
+      const wrap = document.querySelector(`.facet[data-key="${def.key}"]`);
+      if (wrap) wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
+
+    // clear search
+    setSearchTerms('');
+    if ($search) $search.value = '';
+
+    renderPopups();
+    rebuildLinks($edgeMode.value);
+    renderLegend(nodes, activeIds);
+  }
+
+  // background click already clears selection; no need for a dedicated Clear selection button
+
+  if ($resetBtn) {
+    $resetBtn.onclick = doReset;
+  }
+
 
   // Edge & coloring handlers
-  $edgeMode.onchange=()=>{ const sim=$edgeMode.value==='similarity'; $simOptions.style.display=sim?'block':'none'; rebuildLinks($edgeMode.value); setLegendVisible(false); setLegendVisible(getLegendInitialVisibility()); };
+  $edgeMode.onchange = () => {
+    const sim = $edgeMode.value === 'similarity';
+    $simOptions.style.display = sim ? 'block' : 'none';
+    rebuildLinks($edgeMode.value);
+    renderLegend(nodes, activeIds);
+    setLegendVisible(true);   // keep legend on
+  };
+
   $th.oninput=()=>{ $thLbl.textContent=$th.value+'%'; rebuildLinks($edgeMode.value); };
   ;['language','project','city','expertise','experience'].forEach(k=>{ document.getElementById('simChk-'+k).onchange=()=>rebuildLinks($edgeMode.value); });
-  document.getElementById('nodeColorBy').onchange=()=>{ window.nodeColorMode=$nodeColorBy.value; applyColors(); renderLegend(nodes,activeIds); setLegendVisible(true); };
+  $nodeColorBy.onchange = () => {
+    window.nodeColorMode = $nodeColorBy.value;
+    applyColors();
+    renderLegend(nodes, activeIds);
+    setLegendVisible(true);
+  };
 
-  function positionOverlayNearButton(btn, panel, align='left') {
-    const rect = btn.getBoundingClientRect();
-    const pad = 10; 
+  function positionOverlayNearButton(btn, panel){
     const host = document.getElementById('graph');
     const hostRect = host.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    const pad = 10;
 
-    let top  = rect.top  - hostRect.top;
-    let left = rect.left - hostRect.left;
-
-    left += rect.width + pad;
-
-    const maxLeft = host.clientWidth - panel.offsetWidth - pad;
-    const maxTop  = host.clientHeight - panel.offsetHeight - pad;
-    left = Math.max(pad, Math.min(left, maxLeft));
-    top  = Math.max(pad, Math.min(top,  maxTop));
-
+    // Ensure panel has size
     panel.classList.add('is-floating');
+    const panelW = panel.offsetWidth;
+    const panelH = panel.offsetHeight;
+
+    // Center horizontally over the button
+    let left = btnRect.left - hostRect.left + btnRect.width / 2 - panelW / 2;
+    // Try to place ABOVE the button
+    let top  = btnRect.top  - hostRect.top - panelH - pad;
+
+    // If there isn't room above, place just below the button
+    if (top < pad) {
+      top = btnRect.top - hostRect.top + btnRect.height + pad;
+    }
+
+    // Clamp inside graph bounds
+    left = Math.max(pad, Math.min(left, host.clientWidth  - panelW - pad));
+    top  = Math.max(pad, Math.min(top,  host.clientHeight - panelH - pad));
+
     panel.style.left = `${left}px`;
     panel.style.top  = `${top}px`;
     panel.hidden = false;
     panel.focus();
-  }
+}
+
+
 
   // Init
   buildFacets();
-  createFacetBar(); 
+  createFacetBar();
   rebuildLinks('similarity');
   applyFilters();
-  setLegendVisible(false);
-})();
+  setLegendVisible(true);
+  })();
+
 </script>
 </body>
 </html>
