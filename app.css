@@ -16,7 +16,6 @@
 #graph>#3d{ position:absolute; inset:0; }
 #right{ grid-area:right; padding:12px; overflow:auto; border:1px solid var(--app-border); border-radius:14px; background: var(--app-surface,#111); box-shadow:0 2px 12px rgba(0,0,0,.3); color: var(--app-text,#e5e5e5); }
 
-/* Hide legacy panels if still in DOM */
 #left, #bottom{ display:none !important; }
 
 /* ===== Floating toolbar ===== */
@@ -32,14 +31,14 @@
 
 
 /* ===== Overlay panels ===== */
-.overlay-panel{ position:absolute; top:54px; right:10px; width:320px; max-height:60%; overflow:auto; background: rgba(10,10,10,.9); border:1px solid rgba(255,255,255,.12); border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); z-index:6; backdrop-filter: blur(6px); }
+.overlay-panel{ position:absolute; top:54px; right:10px; width:100px; max-height:60%; overflow:auto; background: rgba(10,10,10,.9); border:1px solid rgba(255,255,255,.12); border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); z-index:6; backdrop-filter: blur(6px); }
 .overlay-head{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.12); }
 .overlay-head .title{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#9aa0a6; font-weight:900; }
 
 #overlay-filters .overlay-head .title {display: none;} /* padding: 6px 8px; */
 
 
-.overlay-body{ padding:10px 12px; }
+.overlay-body{ padding:10px 12px}
 .overlay-close{ all:unset; cursor:pointer; padding:2px 6px; border-radius:8px; border:1px solid rgba(214,255,79,.6); color:#D6FF4F; font-weight:700; font-size:12px; }
 
 /* ===== Legend + pills (unchanged base) ===== */
@@ -448,7 +447,7 @@ tr.selected { background: rgba(217,255,75,.12); }
   right: 10px;      /* keep */
   bottom: auto;     /* was bottom: 10px; */
   left: auto;       /* keep */
-  width: 260px;
+  width: 130px;
   max-height: calc(50% - 20px);
   overflow-y: auto;
   background: rgba(10,10,10,.85);
@@ -609,13 +608,13 @@ tr.selected { background: rgba(217,255,75,.12); }
 .facet-bar {
     position: absolute;
     bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 16px;
+    /* transform: translateX(-80%); */ 
     display: flex;
     flex-direction: row;
     gap: 8px;
     flex-wrap: wrap;        /* allows wrapping on small screens */
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
     z-index: 20;
 }

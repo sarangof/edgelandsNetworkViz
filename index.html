@@ -209,7 +209,7 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
   <div id="thresholdControl" class="threshold-box">
     <label for="simThreshold" class="muted" style="margin-right:6px;">Edge threshold</label>
-    <input type="range" id="simThreshold" min="0" max="100" step="5" value="10">
+    <input type="range" id="simThreshold" min="0" max="100" step="5" value="15">
     <span id="simThresholdLabel" style="margin-left:6px;">15%</span>
   </div>
 
@@ -272,8 +272,8 @@ Edgelands People Network — OVERLAY UI REFACTOR
     event: false,
     project: true,
     language: false,
-    experience: true,
-    expertise: true,
+    experience: false,
+    expertise: false,
     city: false
   };
 
@@ -475,6 +475,21 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
   let openFacetKey = null;
 
+  function applySimilarityStateToUI(){
+    facetDefs.forEach(def => {
+      const wrap = document.querySelector(`.facet[data-key="${def.key}"]`);
+      if (!wrap) return;
+
+      const slider = wrap.querySelector('.facet-topology-bar input[type="range"]');
+      const stateEl = wrap.querySelector('.facet-topology-bar .state');
+      const on = !!similarityFieldsState[def.key];
+
+      if (slider) slider.value = on ? '1' : '0';
+      if (stateEl) stateEl.textContent = on ? 'On' : 'Off';
+    });
+  }
+
+
 
   function createFacetBar(){
     const rail = document.getElementById('facetBar');
@@ -540,39 +555,48 @@ Edgelands People Network — OVERLAY UI REFACTOR
   $clearSearch?.addEventListener('click',()=>{ $search.value=''; setSearchTerms(''); applyFilters(); });
 
   // Active list (right panel) → cards
-  
-    function renderCardsList(){
-      // If there is a selection, show only selected nodes.
-      // Otherwise, show all active nodes.
-      const base = selectedIds.size
-        ? nodes.filter(n => selectedIds.has(n.id))
-        : nodes.filter(n => activeIds.has(n.id));
 
-      const rowsActive = base
-        .sort((a,b) =>
-          (a.last||'').localeCompare(b.last||'') ||
-          (a.first||'').localeCompare(b.first||'')
-        );
+  function renderCardsList(){
+    // Always show all active nodes, but:
+    // - selected nodes are pinned to the top
+    // - non-selected nodes follow, all highlighted via .is-selected
+    const base = nodes.filter(n => activeIds.has(n.id));
 
-      if (!rowsActive.length){
-        $cardsList.innerHTML = '<div class="muted">No people match the current filters.</div>';
-        return;
-      }
+    if (!base.length){
+      $cardsList.innerHTML = '<div class="muted">No people match the current filters.</div>';
+      return;
+    }
 
-      $cardsList.innerHTML = rowsActive.map(n => {
-        const name = [n.first, n.last].filter(Boolean).join(' ') || '(unnamed)';
-        const cityTag = n.city ? ` (${n.city})` : '';
-        const header = `
-          <div class="pc-header">
-            <div class="pc-name">${name}${cityTag}</div>
-            ${n.email ? `<button class="pc-email-btn" data-email="${n.email}" title="Email ${name}">✉</button>` : ''}
-          </div>
-        `;
+    const selected = [];
+    const others = [];
 
+    base.forEach(n => {
+      if (selectedIds.has(n.id)) selected.push(n);
+      else others.push(n);
+    });
+
+    const sortByName = (a, b) =>
+      (a.last || '').localeCompare(b.last || '') ||
+      (a.first || '').localeCompare(b.first || '');
+
+    selected.sort(sortByName);
+    others.sort(sortByName);
+
+    const rowsActive = selected.concat(others);
+
+    $cardsList.innerHTML = rowsActive.map(n => {
+      const name = [n.first, n.last].filter(Boolean).join(' ') || '(unnamed)';
+      const cityTag = n.city ? ` (${n.city})` : '';
+      const header = `
+        <div class="pc-header">
+          <div class="pc-name">${name}${cityTag}</div>
+          ${n.email ? `<button class="pc-email-btn" data-email="${n.email}" title="Email ${name}">✉</button>` : ''}
+        </div>
+      `;
 
       const lineAffLangExpParts = [];
-      if (n.project) lineAffLangExpParts.push(`Project: ${n.project}`);
-      if (n.language) lineAffLangExpParts.push(`Lang: ${n.language}`);
+      if (n.project)   lineAffLangExpParts.push(`Project: ${n.project}`);
+      if (n.language)  lineAffLangExpParts.push(`Lang: ${n.language}`);
       if (n.experience) lineAffLangExpParts.push(`Exp: ${n.experience}`);
 
       const lineAffLangExp = lineAffLangExpParts.join(' · ');
@@ -586,6 +610,25 @@ Edgelands People Network — OVERLAY UI REFACTOR
         </div>
       `;
     }).join('');
+
+    // Click to select person (node selection mirrors this)
+    Array.from($cardsList.querySelectorAll('.person-card')).forEach(el => {
+      el.onclick = () => {
+        const id = el.getAttribute('data-id');
+        toggleSelectById(id);
+      };
+    });
+
+    // Email button: open mailto without toggling selection
+    Array.from($cardsList.querySelectorAll('.pc-email-btn')).forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const email = btn.getAttribute('data-email');
+        if (email) window.location.href = `mailto:${email}`;
+      });
+    });
+  }
+
 
     // Click to select person
     Array.from($cardsList.querySelectorAll('.person-card')).forEach(el => {
@@ -603,7 +646,6 @@ Edgelands People Network — OVERLAY UI REFACTOR
         if (email) window.location.href = `mailto:${email}`;
       });
     });
-  }
 
   
   function updateCounts(){ const visN=activeIds.size||0; let visE=0; for(const l of links){ const s=typeof l.source==='object'?l.source.id:l.source; const t=typeof l.target==='object'?l.target.id:l.target; if(activeIds.has(s)&&activeIds.has(t)) visE++; } $counts.textContent=`Visible: ${visN} nodes, ${visE} edges`; }
@@ -636,7 +678,30 @@ Edgelands People Network — OVERLAY UI REFACTOR
 
   // Quick view preset buttons
   document.getElementById('randomViewBtn').addEventListener('click',()=>{ $edgeMode.value='random'; $edgeMode.dispatchEvent(new Event('change')); });
-  document.getElementById('defaultViewBtn').addEventListener('click',()=>{ $edgeMode.value='similarity'; $edgeMode.dispatchEvent(new Event('change')); });
+  document.getElementById('defaultViewBtn').addEventListener('click', () => {
+    // 1) Enforce "Project only" topology in state
+    similarityFieldsState.event      = false;
+    similarityFieldsState.project    = true;
+    similarityFieldsState.language   = false;
+    similarityFieldsState.experience = false;
+    similarityFieldsState.expertise  = false;
+    similarityFieldsState.city       = false;
+
+    // 2) Reflect that in the facet topology sliders
+    applySimilarityStateToUI();
+
+    // 3) Set threshold to 15% and update label
+    $th.value = 15;
+    $thLbl.textContent = '15%';
+
+    // 4) Ensure we're in similarity mode and rebuild edges
+    $edgeMode.value = 'similarity';
+    rebuildLinks('similarity');
+
+    // 5) Re-apply filters/colors/legend with this topology
+    applyFilters();
+  });
+
 
   // Floating actions
   function doReset(){
@@ -721,6 +786,7 @@ Edgelands People Network — OVERLAY UI REFACTOR
   // Init
   buildFacets();
   createFacetBar();
+  applySimilarityStateToUI();
   rebuildLinks('similarity');
   applyFilters();
   setLegendVisible(true);
